@@ -1,0 +1,52 @@
+{
+    "common": {
+        "name": "Päivityskortti",
+        "description": "Päivitysentiteetit ryhmittäin, yhdellä rivillä kun mitään ei ole odottamassa",
+        "title": "Päivitykset",
+        "invalid_configuration": "Virheelliset asetukset",
+        "no_entities": "Päivitysentiteettejä ei löytynyt",
+        "all_current_count": "Kaikki ajan tasalla · {n}",
+        "current_unreachable": "Ajan tasalla · {n} ei tavoitettavissa",
+        "pending_count": "{n} odottaa päivitystä",
+        "all_updated": "Kaikki päivitetty",
+        "current_count": "{n} ajan tasalla",
+        "unreachable_count": "{n} ei tavoitettavissa",
+        "show": "Näytä",
+        "hide": "Piilota",
+        "install": "Päivitä {name}",
+        "update_all": "Päivitä kaikki",
+        "update_all_running": "Päivitetään kaikkia",
+        "stop": "Pysäytä",
+        "stop_confirm": "Pysäytetäänkö päivitys? Juuri päivittymässä oleva laite voi vielä päivittyä loppuun.",
+        "updating": "Päivitetään {name}",
+        "progress": "{done}/{n} valmiina",
+        "failed": "{name} ei päivittynyt",
+        "not_installed": "Päivitys päättyi, mutta versio on yhä {version}."
+    },
+    "status": {
+        "running": "Päivitetään",
+        "done": "Päivitetty",
+        "failed": "Epäonnistui",
+        "unreachable": "Ei tavoitettavissa"
+    },
+    "editor": {
+        "title": "Otsikko",
+        "groups": "Ryhmät",
+        "name": "Nimi",
+        "name_helper": "Näytetään ryhmän yläpuolella. Jätä tyhjäksi, jos ryhmä ei tarvitse otsikkoa.",
+        "integration": "Integraatio",
+        "integration_helper": "Vain tämän integraation päivitysentiteetit.",
+        "areas": "Alueet",
+        "areas_helper": "Vain näiden alueiden päivitysentiteetit, entiteetin oman tai sen laitteen alueen mukaan.",
+        "exclude_areas": "Pois jätettävät alueet",
+        "exclude_areas_helper": "Ei päivitysentiteettejä näiltä alueilta.",
+        "entities": "Entiteetit",
+        "entities_helper": "Juuri nämä päivitysentiteetit, yllä olevan integraation ja alueiden sijaan.",
+        "exclude": "Pois jätettävät entiteetit",
+        "exclude_helper": "Päivitysentiteetit, joita ei koskaan näytetä tässä ryhmässä.",
+        "install_action": "Päivitä kaikki",
+        "install_action_helper": "Mitä Päivitä kaikki -painike tekee, esimerkiksi skripti, joka päivittää laitteet yksi kerrallaan. Jos jätät asetuksen tyhjäksi, Päivitä kaikki -painiketta ei näytetä.",
+        "max_height": "Enimmäiskorkeus",
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lista vierii. Osioihin jaetun näkymän asettelu-välilehdellä asetettu korkeus ohittaa tämän."
+    }
+}

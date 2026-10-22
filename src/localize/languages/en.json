@@ -1,0 +1,52 @@
+{
+    "common": {
+        "name": "Updates card",
+        "description": "Update entities in groups, folded to one line when nothing is waiting",
+        "title": "Updates",
+        "invalid_configuration": "Invalid configuration",
+        "no_entities": "No update entities found",
+        "all_current_count": "All up to date · {n}",
+        "current_unreachable": "Up to date · {n} unreachable",
+        "pending_count": "{n} waiting for an update",
+        "all_updated": "All updated",
+        "current_count": "{n} up to date",
+        "unreachable_count": "{n} unreachable",
+        "show": "Show",
+        "hide": "Hide",
+        "install": "Update {name}",
+        "update_all": "Update all",
+        "update_all_running": "Updating all",
+        "stop": "Stop",
+        "stop_confirm": "Stop updating? The device being updated now may still finish.",
+        "updating": "Updating {name}",
+        "progress": "{done}/{n} done",
+        "failed": "{name} wasn't updated",
+        "not_installed": "The update ended, but the version is still {version}."
+    },
+    "status": {
+        "running": "Updating",
+        "done": "Updated",
+        "failed": "Failed",
+        "unreachable": "Unreachable"
+    },
+    "editor": {
+        "title": "Title",
+        "groups": "Groups",
+        "name": "Name",
+        "name_helper": "Shown above the group. Leave empty for a group without a heading.",
+        "integration": "Integration",
+        "integration_helper": "Only update entities of this integration.",
+        "areas": "Areas",
+        "areas_helper": "Only update entities in these areas, by the entity's own area or its device's.",
+        "exclude_areas": "Excluded areas",
+        "exclude_areas_helper": "No update entities from these areas.",
+        "entities": "Entities",
+        "entities_helper": "Exactly these update entities, instead of the integration and areas above.",
+        "exclude": "Excluded entities",
+        "exclude_helper": "Update entities never shown in this group.",
+        "install_action": "Update all",
+        "install_action_helper": "What the Update all button does, such as a script that updates one device after another. Without it, there is no such button.",
+        "max_height": "Maximum height",
+        "max_height_helper": "The card grows with its content up to this height, and then the list scrolls. A height set in the layout tab of a sections view is used instead."
+    }
+}

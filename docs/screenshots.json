@@ -1,0 +1,646 @@
+{
+    "clock": "2026-10-21T18:00:00+03:00",
+    "states": {
+        "update.kitchen_plug_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Kitchen plug Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.kitchen_plug_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Kitchen plug Status"
+            }
+        },
+        "update.fridge_plug_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Fridge plug Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.fridge_plug_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Fridge plug Status"
+            }
+        },
+        "update.hall_light_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Hall light Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.hall_light_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Hall light Status"
+            }
+        },
+        "update.desk_lamp_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Desk lamp Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.desk_lamp_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Desk lamp Status"
+            }
+        },
+        "update.heat_pump_plug_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Heat pump plug Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.heat_pump_plug_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Heat pump plug Status"
+            }
+        },
+        "update.power_meter_firmware": {
+            "state": "off",
+            "attributes": {
+                "friendly_name": "Power meter Firmware",
+                "installed_version": "2026.10.0",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.power_meter_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Power meter Status"
+            }
+        },
+        "update.doorbell_firmware": {
+            "state": "off",
+            "attributes": {
+                "friendly_name": "Doorbell Firmware",
+                "installed_version": "2026.10.0",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.doorbell_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Doorbell Status"
+            }
+        },
+        "update.greenhouse_sensor_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Greenhouse sensor Firmware",
+                "installed_version": "2026.9.1",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.greenhouse_sensor_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Greenhouse sensor Status"
+            }
+        },
+        "update.gate_controller_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Gate controller Firmware",
+                "installed_version": "2026.8.2",
+                "latest_version": "2026.10.0",
+                "title": "ESPHome",
+                "supported_features": 1,
+                "in_progress": false,
+                "release_url": "https://esphome.io/changelog/"
+            }
+        },
+        "binary_sensor.gate_controller_status": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Gate controller Status"
+            }
+        },
+        "update.pond_pump_plug_firmware": {
+            "state": "unavailable",
+            "attributes": {
+                "friendly_name": "Pond pump plug Firmware"
+            }
+        },
+        "binary_sensor.pond_pump_plug_status": {
+            "state": "unavailable",
+            "attributes": {
+                "friendly_name": "Pond pump plug Status"
+            }
+        },
+        "update.home_assistant_core_update": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Home Assistant Core",
+                "installed_version": "2026.10.2",
+                "latest_version": "2026.10.3",
+                "title": "Home Assistant Core",
+                "supported_features": 11,
+                "in_progress": false
+            }
+        },
+        "update.home_assistant_operating_system_update": {
+            "state": "off",
+            "attributes": {
+                "friendly_name": "Home Assistant Operating System",
+                "installed_version": "18.3",
+                "latest_version": "18.3",
+                "title": "Home Assistant Operating System",
+                "supported_features": 11,
+                "in_progress": false
+            }
+        },
+        "update.mushroom_update": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Mushroom",
+                "installed_version": "v5.2.3",
+                "latest_version": "v5.3.0",
+                "title": "Mushroom",
+                "supported_features": 21,
+                "in_progress": false
+            }
+        },
+        "update.card_mod_update": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "card-mod",
+                "installed_version": "v4.2.1",
+                "latest_version": "v4.2.2",
+                "title": "card-mod",
+                "supported_features": 21,
+                "in_progress": false
+            }
+        },
+        "update.map_card_update": {
+            "state": "off",
+            "attributes": {
+                "friendly_name": "map-card",
+                "installed_version": "v1.16.0",
+                "latest_version": "v1.16.0",
+                "title": "map-card",
+                "supported_features": 21,
+                "in_progress": false
+            }
+        },
+        "update.router_firmware": {
+            "state": "on",
+            "attributes": {
+                "friendly_name": "Router",
+                "installed_version": "26.7.7",
+                "latest_version": "26.7.8",
+                "title": "Router",
+                "supported_features": 16,
+                "in_progress": false
+            }
+        },
+        "script.update_devices": {
+            "state": "off",
+            "attributes": {
+                "friendly_name": "Update devices"
+            }
+        }
+    },
+    "entities": {
+        "update.kitchen_plug_firmware": {
+            "platform": "esphome",
+            "device_id": "kitchen_plug"
+        },
+        "binary_sensor.kitchen_plug_status": {
+            "platform": "esphome",
+            "device_id": "kitchen_plug"
+        },
+        "update.fridge_plug_firmware": {
+            "platform": "esphome",
+            "device_id": "fridge_plug"
+        },
+        "binary_sensor.fridge_plug_status": {
+            "platform": "esphome",
+            "device_id": "fridge_plug"
+        },
+        "update.hall_light_firmware": {
+            "platform": "esphome",
+            "device_id": "hall_light"
+        },
+        "binary_sensor.hall_light_status": {
+            "platform": "esphome",
+            "device_id": "hall_light"
+        },
+        "update.desk_lamp_firmware": {
+            "platform": "esphome",
+            "device_id": "desk_lamp"
+        },
+        "binary_sensor.desk_lamp_status": {
+            "platform": "esphome",
+            "device_id": "desk_lamp"
+        },
+        "update.heat_pump_plug_firmware": {
+            "platform": "esphome",
+            "device_id": "heat_pump_plug"
+        },
+        "binary_sensor.heat_pump_plug_status": {
+            "platform": "esphome",
+            "device_id": "heat_pump_plug"
+        },
+        "update.power_meter_firmware": {
+            "platform": "esphome",
+            "device_id": "power_meter"
+        },
+        "binary_sensor.power_meter_status": {
+            "platform": "esphome",
+            "device_id": "power_meter"
+        },
+        "update.doorbell_firmware": {
+            "platform": "esphome",
+            "device_id": "doorbell"
+        },
+        "binary_sensor.doorbell_status": {
+            "platform": "esphome",
+            "device_id": "doorbell"
+        },
+        "update.greenhouse_sensor_firmware": {
+            "platform": "esphome",
+            "device_id": "greenhouse_sensor"
+        },
+        "binary_sensor.greenhouse_sensor_status": {
+            "platform": "esphome",
+            "device_id": "greenhouse_sensor"
+        },
+        "update.gate_controller_firmware": {
+            "platform": "esphome",
+            "device_id": "gate_controller"
+        },
+        "binary_sensor.gate_controller_status": {
+            "platform": "esphome",
+            "device_id": "gate_controller"
+        },
+        "update.pond_pump_plug_firmware": {
+            "platform": "esphome",
+            "device_id": "pond_pump_plug"
+        },
+        "binary_sensor.pond_pump_plug_status": {
+            "platform": "esphome",
+            "device_id": "pond_pump_plug"
+        },
+        "update.home_assistant_core_update": {
+            "platform": "hassio"
+        },
+        "update.home_assistant_operating_system_update": {
+            "platform": "hassio"
+        },
+        "update.mushroom_update": {
+            "platform": "hacs"
+        },
+        "update.card_mod_update": {
+            "platform": "hacs"
+        },
+        "update.map_card_update": {
+            "platform": "hacs"
+        },
+        "update.router_firmware": {
+            "platform": "opnsense"
+        }
+    },
+    "devices": {
+        "kitchen_plug": {
+            "name": "kitchen_plug",
+            "name_by_user": "Kitchen plug",
+            "area_id": "house"
+        },
+        "fridge_plug": {
+            "name": "fridge_plug",
+            "name_by_user": "Fridge plug",
+            "area_id": "house"
+        },
+        "hall_light": {
+            "name": "hall_light",
+            "name_by_user": "Hall light",
+            "area_id": "house"
+        },
+        "desk_lamp": {
+            "name": "desk_lamp",
+            "name_by_user": "Desk lamp",
+            "area_id": "house"
+        },
+        "heat_pump_plug": {
+            "name": "heat_pump_plug",
+            "name_by_user": "Heat pump plug",
+            "area_id": "house"
+        },
+        "power_meter": {
+            "name": "power_meter",
+            "name_by_user": "Power meter",
+            "area_id": "house"
+        },
+        "doorbell": {
+            "name": "doorbell",
+            "name_by_user": "Doorbell",
+            "area_id": "house"
+        },
+        "greenhouse_sensor": {
+            "name": "greenhouse_sensor",
+            "name_by_user": "Greenhouse sensor",
+            "area_id": "garden"
+        },
+        "gate_controller": {
+            "name": "gate_controller",
+            "name_by_user": "Gate controller",
+            "area_id": "garden"
+        },
+        "pond_pump_plug": {
+            "name": "pond_pump_plug",
+            "name_by_user": "Pond pump plug",
+            "area_id": "garden"
+        }
+    },
+    "shots": [
+        {
+            "name": "waiting",
+            "width": 450,
+            "card": {
+                "type": "custom:updates-card",
+                "title": "ESPHome devices",
+                "groups": [
+                    {
+                        "name": "House",
+                        "integration": "esphome",
+                        "exclude_areas": ["garden"]
+                    },
+                    {
+                        "name": "Garden",
+                        "integration": "esphome",
+                        "areas": ["garden"]
+                    }
+                ],
+                "install_action": {
+                    "action": "perform-action",
+                    "perform_action": "script.update_devices"
+                }
+            }
+        },
+        {
+            "name": "folded",
+            "width": 450,
+            "card": {
+                "type": "custom:updates-card",
+                "title": "ESPHome devices",
+                "groups": [
+                    {
+                        "name": "House",
+                        "integration": "esphome",
+                        "exclude_areas": ["garden"]
+                    },
+                    {
+                        "name": "Garden",
+                        "integration": "esphome",
+                        "areas": ["garden"]
+                    }
+                ],
+                "install_action": {
+                    "action": "perform-action",
+                    "perform_action": "script.update_devices"
+                }
+            },
+            "states": {
+                "update.kitchen_plug_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Kitchen plug Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.fridge_plug_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Fridge plug Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.hall_light_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Hall light Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.desk_lamp_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Desk lamp Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.heat_pump_plug_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Heat pump plug Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.power_meter_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Power meter Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.doorbell_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Doorbell Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.greenhouse_sensor_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Greenhouse sensor Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.gate_controller_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Gate controller Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "update.pond_pump_plug_firmware": {
+                    "state": "off",
+                    "attributes": {
+                        "friendly_name": "Pond pump plug Firmware",
+                        "installed_version": "2026.10.0",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": false,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                },
+                "binary_sensor.pond_pump_plug_status": {
+                    "state": "on",
+                    "attributes": {
+                        "friendly_name": "Pond pump plug Status"
+                    }
+                }
+            }
+        },
+        {
+            "name": "running",
+            "width": 450,
+            "card": {
+                "type": "custom:updates-card",
+                "title": "ESPHome devices",
+                "groups": [
+                    {
+                        "name": "House",
+                        "integration": "esphome",
+                        "exclude_areas": ["garden"]
+                    },
+                    {
+                        "name": "Garden",
+                        "integration": "esphome",
+                        "areas": ["garden"]
+                    }
+                ],
+                "install_action": {
+                    "action": "perform-action",
+                    "perform_action": "script.update_devices"
+                }
+            },
+            "states": {
+                "script.update_devices": {
+                    "state": "on",
+                    "attributes": {
+                        "friendly_name": "Update devices"
+                    }
+                },
+                "update.desk_lamp_firmware": {
+                    "state": "on",
+                    "attributes": {
+                        "friendly_name": "Desk lamp Firmware",
+                        "installed_version": "2026.9.1",
+                        "latest_version": "2026.10.0",
+                        "title": "ESPHome",
+                        "supported_features": 1,
+                        "in_progress": true,
+                        "release_url": "https://esphome.io/changelog/"
+                    }
+                }
+            }
+        },
+        {
+            "name": "mixed",
+            "width": 450,
+            "card": {
+                "type": "custom:updates-card",
+                "groups": [
+                    {
+                        "name": "Home Assistant",
+                        "integration": "hassio"
+                    },
+                    {
+                        "name": "HACS",
+                        "integration": "hacs"
+                    },
+                    {
+                        "name": "Network",
+                        "integration": "opnsense"
+                    }
+                ]
+            }
+        }
+    ]
+}
