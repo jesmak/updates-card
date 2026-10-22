@@ -374,7 +374,7 @@ export class UpdatesCard extends LitElement {
                     (bunch) => this.bunch(group, bunch, byId, busy),
                 )}
                 ${singles.length > 0 ? html`<div class="grp-body">${keyed(singles, (r) => this.waitingRow(byId.get(r.entity_id)!, busy))}</div>` : nothing}
-                ${this.unreachableLine(group, unreachable)} ${current.length > 0 ? this.fold(quiet || this.open, rest) : nothing}
+                ${current.length > 0 ? this.fold(quiet || this.open, rest) : nothing} ${this.unreachableLine(group, unreachable)}
             </div>`,
         );
     }
@@ -462,7 +462,10 @@ export class UpdatesCard extends LitElement {
         </div>`;
     }
 
-    /** A group's devices out of reach: a muted line that opens to them. Their versions may be unknown while they're away. */
+    /**
+     * A group's devices out of reach: a muted line at the group's end, set apart by a rule, that opens to them. Their
+     * versions may be unknown while they're away.
+     */
     private unreachableLine(group: Group, rows: Row[]): TemplateResult | typeof nothing {
         if (rows.length === 0) {
             return nothing;
@@ -482,7 +485,7 @@ export class UpdatesCard extends LitElement {
                         rows,
                         (row) =>
                             html`<div
-                                class="row"
+                                class="row sib"
                                 role="button"
                                 tabindex="0"
                                 @click=${() => this.moreInfo(row.entity_id)}
@@ -492,7 +495,7 @@ export class UpdatesCard extends LitElement {
                                     <div class="name">${row.name}</div>
                                     ${row.latest && row.latest !== row.installed ? this.versions(row.installed, row.latest) : nothing}
                                 </div>
-                                <div class="end"><span class="pill off">${this.text("status.unreachable")}</span></div>
+                                <div class="end"><span class="off-state">${this.text("status.unreachable")}</span></div>
                             </div>`,
                     )}
                 </div>`,
@@ -998,17 +1001,27 @@ export class UpdatesCard extends LitElement {
                 max-width: 100%;
             }
 
+            /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
             .off-line {
+                --uc-inset: 16px;
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 width: 100%;
                 box-sizing: border-box;
-                padding: 8px 12px 2px 16px;
+                margin-top: 6px;
+                padding: 10px 12px 2px var(--uc-inset);
+                background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12))) no-repeat
+                    left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
                 font-size: 12px;
                 color: var(--secondary-text-color);
                 opacity: 0.8;
                 --mdc-icon-size: 16px;
+            }
+
+            .off-state {
+                font-size: 11.5px;
+                white-space: nowrap;
             }
 
             .grow {
@@ -1064,9 +1077,12 @@ export class UpdatesCard extends LitElement {
                 .row,
                 .sum,
                 .one,
-                .grp-h,
-                .off-line {
+                .grp-h {
                     padding-left: 10px;
+                }
+
+                .off-line {
+                    --uc-inset: 10px;
                 }
 
                 .hd-sub,

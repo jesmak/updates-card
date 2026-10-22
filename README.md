@@ -100,6 +100,9 @@ their group, and don't keep the card from folding into one line. ESPHome, for on
 entity available, and its status sensor too, which turns off. That is why the device's other entities are asked, and
 why a connection sensor counts by what it says.
 
+**A device that isn't there.** The card lists update entities, and Home Assistant creates a new ESPHome device's update
+entity disabled. Such a device shows once its update entity is enabled in the device's settings.
+
 ## Sizes
 
 The card takes a whole section by default and can be made as narrow as half of one. Below 300 pixels, the **Update

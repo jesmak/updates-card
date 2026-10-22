@@ -1,4 +1,4 @@
-/*! updates-card 1.0.0 | MIT License */
+/*! updates-card 1.0.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.0.0";
+var CARD_VERSION = "1.0.1";
 var FEATURE_INSTALL = 1;
 var BUNCH_MIN = 3;
 var DONE_KEEP = 5 * 6e4;
@@ -1363,7 +1363,7 @@ var UpdatesCard = class extends i4 {
         (bunch) => this.bunch(group, bunch, byId, busy)
       )}
                 ${singles.length > 0 ? b2`<div class="grp-body">${keyed(singles, (r6) => this.waitingRow(byId.get(r6.entity_id), busy))}</div>` : A}
-                ${this.unreachableLine(group, unreachable)} ${current.length > 0 ? this.fold(quiet || this.open, rest) : A}
+                ${current.length > 0 ? this.fold(quiet || this.open, rest) : A} ${this.unreachableLine(group, unreachable)}
             </div>`
     );
   }
@@ -1442,7 +1442,10 @@ var UpdatesCard = class extends i4 {
             <div class="end"><span class="ver">${row.installed}</span></div>
         </div>`;
   }
-  /** A group's devices out of reach: a muted line that opens to them. Their versions may be unknown while they're away. */
+  /**
+   * A group's devices out of reach: a muted line at the group's end, set apart by a rule, that opens to them. Their
+   * versions may be unknown while they're away.
+   */
   unreachableLine(group, rows) {
     if (rows.length === 0) {
       return A;
@@ -1461,7 +1464,7 @@ var UpdatesCard = class extends i4 {
                     ${keyed(
         rows,
         (row) => b2`<div
-                                class="row"
+                                class="row sib"
                                 role="button"
                                 tabindex="0"
                                 @click=${() => this.moreInfo(row.entity_id)}
@@ -1471,7 +1474,7 @@ var UpdatesCard = class extends i4 {
                                     <div class="name">${row.name}</div>
                                     ${row.latest && row.latest !== row.installed ? this.versions(row.installed, row.latest) : A}
                                 </div>
-                                <div class="end"><span class="pill off">${this.text("status.unreachable")}</span></div>
+                                <div class="end"><span class="off-state">${this.text("status.unreachable")}</span></div>
                             </div>`
       )}
                 </div>`
@@ -1953,17 +1956,27 @@ var UpdatesCard = class extends i4 {
                 max-width: 100%;
             }
 
+            /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
             .off-line {
+                --uc-inset: 16px;
                 display: flex;
                 align-items: center;
                 gap: 8px;
                 width: 100%;
                 box-sizing: border-box;
-                padding: 8px 12px 2px 16px;
+                margin-top: 6px;
+                padding: 10px 12px 2px var(--uc-inset);
+                background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12))) no-repeat
+                    left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
                 font-size: 12px;
                 color: var(--secondary-text-color);
                 opacity: 0.8;
                 --mdc-icon-size: 16px;
+            }
+
+            .off-state {
+                font-size: 11.5px;
+                white-space: nowrap;
             }
 
             .grow {
@@ -2019,9 +2032,12 @@ var UpdatesCard = class extends i4 {
                 .row,
                 .sum,
                 .one,
-                .grp-h,
-                .off-line {
+                .grp-h {
                     padding-left: 10px;
+                }
+
+                .off-line {
+                    --uc-inset: 10px;
                 }
 
                 .hd-sub,

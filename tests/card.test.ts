@@ -77,7 +77,7 @@ describe("updates-card", () => {
         (one(element, ".off-line") as HTMLButtonElement).click();
         await element.updateComplete;
         expect(all(element, ".grp-body.muted .row .name").map(text)).toEqual([...SHED].sort());
-        expect(all(element, ".grp-body.muted .pill.off").map(text)).toEqual(["Unreachable", "Unreachable", "Unreachable"]);
+        expect(all(element, ".grp-body.muted .off-state").map(text)).toEqual(["Unreachable", "Unreachable", "Unreachable"]);
     });
 
     describe("the Update all button", () => {
@@ -106,6 +106,17 @@ describe("updates-card", () => {
         expect(all(element, ".grp-h").map(text)).toEqual(["House", "Shed"]);
         expect(all(element, ".row.sib .name").map(text)).toEqual(["Desk lamp", "Hall light", "Heat pump plug", ...[...SHED].sort()]);
         expect(text(one(element, ".switch"))).toBe("6 up to date Hide");
+    });
+
+    it("puts the line of devices out of reach at the end of its group, after the rows up to date", async () => {
+        const element = await card(home({ installed: "2026.2.0" }, WAITING, { 1: { state: "unavailable" } }));
+        (one(element, ".switch") as HTMLButtonElement).click();
+        await element.updateComplete;
+        const house = all(element, ".group").find((g) => text(g.querySelector(".grp-h")) === "House")!;
+        const order = [...house.querySelectorAll(".row.sib, .off-line")]
+            .filter((e) => !e.closest("[inert]"))
+            .map((e) => (e.classList.contains("off-line") ? "line" : "row"));
+        expect(order).toEqual(["row", "row", "row", "line"]);
     });
 
     it("bunches waiting devices of the same software and version, and lists them all when opened", async () => {
