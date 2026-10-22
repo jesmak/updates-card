@@ -881,6 +881,9 @@ function groupEntities(hass, group) {
 function groupConfigs(config) {
   return config.groups?.length ? config.groups : [{}];
 }
+function isDown(state) {
+  return state.state === "unavailable" || state.entity_id.startsWith("binary_sensor.") && state.attributes.device_class === "connectivity" && state.state === "off";
+}
 function deviceCounts(hass) {
   const counts = /* @__PURE__ */ new Map();
   for (const entry of Object.values(hass.entities ?? {})) {
@@ -888,9 +891,9 @@ function deviceCounts(hass) {
     if (!entry?.device_id || !state) {
       continue;
     }
-    const count = counts.get(entry.device_id) ?? { states: 0, unavailable: 0, updates: 0 };
+    const count = counts.get(entry.device_id) ?? { states: 0, down: 0, updates: 0 };
     count.states += 1;
-    count.unavailable += state.state === "unavailable" ? 1 : 0;
+    count.down += isDown(state) ? 1 : 0;
     count.updates += entry.entity_id.startsWith("update.") ? 1 : 0;
     counts.set(entry.device_id, count);
   }
@@ -910,7 +913,7 @@ function rowOf(hass, entityId, counts) {
   const title = typeof attributes.title === "string" && attributes.title ? attributes.title : void 0;
   const software = title ?? entry?.platform ?? ownName;
   const others = count ? count.states - 1 : 0;
-  const othersDown = count ? count.unavailable - (state.state === "unavailable" ? 1 : 0) : 0;
+  const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
   const unreachable = state.state === "unavailable" || others > 0 && othersDown === others;
   const progress = attributes.in_progress;
   return {

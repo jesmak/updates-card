@@ -21,6 +21,7 @@ export interface Sibling {
     id: string;
     device: string;
     state: string;
+    device_class?: string;
 }
 
 export interface Device {
@@ -56,7 +57,12 @@ export function fakeHass(updates: Fake[], devices: Device[] = [], siblings: Sibl
         entities[u.id] = { entity_id: u.id, device_id: u.device, area_id: u.area, platform: u.platform ?? "esphome", hidden: u.hidden };
     }
     for (const s of siblings) {
-        states[s.id] = { entity_id: s.id, state: s.state, last_changed: "2026-01-01T00:00:00Z", attributes: {} };
+        states[s.id] = {
+            entity_id: s.id,
+            state: s.state,
+            last_changed: "2026-01-01T00:00:00Z",
+            attributes: s.device_class ? { device_class: s.device_class } : {},
+        };
         entities[s.id] = { entity_id: s.id, device_id: s.device, platform: "esphome" };
     }
     return {

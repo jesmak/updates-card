@@ -62,6 +62,11 @@ describe("rowOf", () => {
             { id: "update.asleep", device: "d4", state: "on", latest: "2.0.0" },
             { id: "update.lonely", device: "d5", state: "on", latest: "2.0.0" },
             { id: "update.card", platform: "hacs", title: null, features: 0, in_progress: 40 },
+            { id: "update.dozing", device: "d6", state: "on", latest: "2.0.0" },
+            { id: "update.panel", device: "d7", state: "on", latest: "2.0.0" },
+            { id: "update.bridge", device: "d8", state: "on", latest: "2.0.0" },
+            { id: "update.button", device: "d9", state: "on", latest: "2.0.0" },
+            { id: "update.linked", device: "d10", state: "on", latest: "2.0.0" },
         ],
         [
             { id: "d1", name: "plug-1", name_by_user: "Kitchen plug" },
@@ -69,12 +74,26 @@ describe("rowOf", () => {
             { id: "d3", name: "Shed sensor" },
             { id: "d4", name: "Garden sensor" },
             { id: "d5", name: "Lonely sensor" },
+            { id: "d6", name: "Dozing sensor" },
+            { id: "d7", name: "Wall panel" },
+            { id: "d8", name: "Bridge" },
+            { id: "d9", name: "Button" },
+            { id: "d10", name: "Linked sensor" },
         ],
         [
-            { id: "binary_sensor.plug_status", device: "d1", state: "on" },
-            { id: "binary_sensor.shed_status", device: "d3", state: "unavailable" },
+            // A connection sensor, as ESPHome's status sensor, stays available and turns off when its device is gone.
+            { id: "binary_sensor.plug_status", device: "d1", state: "on", device_class: "connectivity" },
+            { id: "binary_sensor.shed_status", device: "d3", state: "off", device_class: "connectivity" },
             { id: "sensor.garden_temperature", device: "d4", state: "unavailable" },
-            { id: "binary_sensor.garden_status", device: "d4", state: "unavailable" },
+            { id: "binary_sensor.garden_status", device: "d4", state: "off", device_class: "connectivity" },
+            { id: "sensor.dozing_temperature", device: "d6", state: "unavailable" },
+            { id: "switch.panel_relay", device: "d7", state: "on" },
+            { id: "binary_sensor.panel_display", device: "d7", state: "off", device_class: "connectivity" },
+            { id: "binary_sensor.bridge_status", device: "d8", state: "off", device_class: "connectivity" },
+            { id: "sensor.button_battery", device: "d9", state: "unavailable" },
+            { id: "binary_sensor.button_press", device: "d9", state: "off" },
+            { id: "sensor.linked_temperature", device: "d10", state: "unavailable" },
+            { id: "binary_sensor.linked_status", device: "d10", state: "on", device_class: "connectivity" },
         ],
     );
     const counts = deviceCounts(hass);
@@ -96,9 +115,14 @@ describe("rowOf", () => {
 
     it.each([
         ["its entity is unavailable", true, "update.away"],
-        ["every other entity of its device is unavailable, though the update entity waits", true, "update.asleep"],
+        ["every other entity of its device is unavailable, though the update entity waits", true, "update.dozing"],
+        ["the rest are unavailable and its connection sensor is off", true, "update.asleep"],
+        ["its only other entity is a connection sensor that is off", true, "update.bridge"],
         ["its device has no other entities to tell by", false, "update.lonely"],
         ["its device's other entities are there", false, "update.plug"],
+        ["a connection sensor is off while the rest are there", false, "update.panel"],
+        ["the rest are unavailable and an ordinary binary sensor is off", false, "update.button"],
+        ["the rest are unavailable but its connection sensor is on", false, "update.linked"],
     ])("when %s, is out of reach: %s", (_name, expected, id) => {
         expect(row(id).unreachable).toBe(expected);
         // A row out of reach doesn't wait, so it never keeps the card from folding.

@@ -7,7 +7,7 @@
  * `v`, `-1`, words), so nothing here reads one as a number.
  */
 import { BUNCH_MIN, FEATURE_INSTALL, VERSION_WAIT } from "./const";
-import type { HomeAssistant } from "./hass";
+import type { HassEntity, HomeAssistant } from "./hass";
 import type { ActionConfig, Bunch, Group, GroupConfig, Row, UpdatesCardConfig } from "./types";
 
 /** Every update entity there is, except those hidden in the registry. */
@@ -54,13 +54,24 @@ export function groupConfigs(config: UpdatesCardConfig): GroupConfig[] {
 }
 
 /**
- * For each device, how many of its entities have a state, how many of those are unavailable, and how many update
- * entities it has. Worked out once for all the rows of an update.
+ * For each device, how many of its entities have a state, how many of those are down, and how many update entities it
+ * has. Worked out once for all the rows of an update.
  */
 export interface DeviceCounts {
     states: number;
-    unavailable: number;
+    down: number;
     updates: number;
+}
+
+/**
+ * Whether an entity says its device is gone: it is unavailable, or it is a connection sensor that is off. ESPHome's
+ * status sensor, for one, stays available and turns off when its device disconnects.
+ */
+function isDown(state: HassEntity): boolean {
+    return (
+        state.state === "unavailable" ||
+        (state.entity_id.startsWith("binary_sensor.") && state.attributes.device_class === "connectivity" && state.state === "off")
+    );
 }
 
 export function deviceCounts(hass: HomeAssistant): Map<string, DeviceCounts> {
@@ -70,9 +81,9 @@ export function deviceCounts(hass: HomeAssistant): Map<string, DeviceCounts> {
         if (!entry?.device_id || !state) {
             continue;
         }
-        const count = counts.get(entry.device_id) ?? { states: 0, unavailable: 0, updates: 0 };
+        const count = counts.get(entry.device_id) ?? { states: 0, down: 0, updates: 0 };
         count.states += 1;
-        count.unavailable += state.state === "unavailable" ? 1 : 0;
+        count.down += isDown(state) ? 1 : 0;
         count.updates += entry.entity_id.startsWith("update.") ? 1 : 0;
         counts.set(entry.device_id, count);
     }
@@ -83,8 +94,8 @@ export function deviceCounts(hass: HomeAssistant): Map<string, DeviceCounts> {
  * An update entity as a row. A device's update entity is named after its device, as the entity's own name adds only
  * "Firmware" to it, unless the device has several update entities, which the device's name wouldn't tell apart.
  *
- * A row is out of reach when its entity is unavailable, or when every other entity of its device is. ESPHome keeps the
- * update entity available after a disconnect the device announced, such as going to sleep, and so may other
+ * A row is out of reach when its entity is unavailable, or when every other entity of its device is down. ESPHome keeps
+ * the update entity available after a disconnect the device announced, such as going to sleep, and so may other
  * integrations.
  */
 export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string, DeviceCounts>): Row | undefined {
@@ -101,7 +112,7 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
     const title = typeof attributes.title === "string" && attributes.title ? attributes.title : undefined;
     const software = title ?? entry?.platform ?? ownName;
     const others = count ? count.states - 1 : 0;
-    const othersDown = count ? count.unavailable - (state.state === "unavailable" ? 1 : 0) : 0;
+    const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
     const unreachable = state.state === "unavailable" || (others > 0 && othersDown === others);
     const progress = attributes.in_progress;
     return {

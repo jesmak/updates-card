@@ -94,10 +94,11 @@ row opens its details.
 the rows' buttons, counts what it has updated, and offers **Stop**, which asks first and then turns the script off. The
 count covers every waiting row the card can install, so a script that leaves some of them out ends short of the total.
 
-**Unreachable devices.** An update entity that is unavailable, or whose device's other entities all are, counts as
-unreachable. Such rows go on a line of their own at the end of their group, and don't keep the card from folding into
-one line. ESPHome, for one, keeps a sleeping device's update entity available, which is why the device's other
-entities are asked too.
+**Unreachable devices.** An update entity counts as unreachable when it is unavailable, or when each of its device's
+other entities is unavailable or is a connection sensor that is off. Such rows go on a line of their own at the end of
+their group, and don't keep the card from folding into one line. ESPHome, for one, keeps a sleeping device's update
+entity available, and its status sensor too, which turns off. That is why the device's other entities are asked, and
+why a connection sensor counts by what it says.
 
 ## Sizes
 
