@@ -1,4 +1,4 @@
-/*! updates-card 1.0.1 | MIT License */
+/*! updates-card 1.0.2 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.0.1";
+var CARD_VERSION = "1.0.2";
 var FEATURE_INSTALL = 1;
 var BUNCH_MIN = 3;
 var DONE_KEEP = 5 * 6e4;
@@ -1735,7 +1735,7 @@ var UpdatesCard = class extends i4 {
                 display: grid;
                 grid-template-rows: 0fr;
                 min-width: 0;
-                transition: grid-template-rows 0.2s ease;
+                transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
             }
 
             .fold.open {

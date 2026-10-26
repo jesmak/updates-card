@@ -780,7 +780,7 @@ export class UpdatesCard extends LitElement {
                 display: grid;
                 grid-template-rows: 0fr;
                 min-width: 0;
-                transition: grid-template-rows 0.2s ease;
+                transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
             }
 
             .fold.open {
