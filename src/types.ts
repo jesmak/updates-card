@@ -1,3 +1,4 @@
+import type { HeightConfig } from "./height";
 import type { LovelaceCardConfig } from "./hass";
 
 /**
@@ -24,15 +25,13 @@ export interface ActionConfig {
     [key: string]: unknown;
 }
 
-export interface UpdatesCardConfig extends LovelaceCardConfig {
+export interface UpdatesCardConfig extends LovelaceCardConfig, HeightConfig {
     /** Shown at the top of the card. Without one the card is titled in the viewer's language. */
     title?: string;
     /** Without groups, every update entity in one group without a name. */
     groups?: GroupConfig[];
     /** What "update all" does, such as a script that installs one device after another. Without it, there is no such button. */
     install_action?: ActionConfig;
-    /** The card's greatest height in pixels. Above it, the list scrolls. A height in grid rows overrides it. */
-    max_height?: number;
 }
 
 /** An update entity as the card shows it. */

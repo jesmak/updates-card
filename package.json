@@ -1,6 +1,6 @@
 {
     "name": "updates-card",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "description": "Home Assistant dashboard card for update entities, in groups, folded to one line when nothing is waiting",
     "keywords": [
         "home-assistant",

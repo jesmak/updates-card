@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { HomeAssistant } from "../src/hass";
+import { browserLanguage, translate } from "../src/localize/localize";
 import "../src/updates-card";
 import type { UpdatesCard } from "../src/updates-card";
 import type { UpdatesCardConfig } from "../src/types";
@@ -183,13 +184,74 @@ describe("updates-card", () => {
     });
 
     it.each([
+        ["held to a height", undefined, { height: 300 }, ["fade-bottom"]],
+        ["held up to a limit", undefined, { max_height: 300 }, ["fade-bottom"]],
+        ["held by rows in a sections view", "grid", { grid_options: { rows: 4 } }, ["fade-bottom"]],
+        [
+            "held to a height with automatic rows in a sections view",
+            "grid",
+            { height: 300, grid_options: { rows: "auto" } },
+            ["fade-bottom"],
+        ],
+        ["held by the older layout options' rows in a sections view", "grid", { layout_options: { grid_rows: 4 } }, ["fade-bottom"]],
+        ["never in auto", undefined, {}, []],
+        ["never in auto with automatic rows in a sections view", "grid", { grid_options: { rows: "auto" } }, []],
+        ["never by grid rows outside a sections view", undefined, { grid_options: { rows: 4 } }, []],
+    ])("fades the bottom edge of a list that runs past it when %s", async (_name, layout, extra, expected) => {
+        const element = await card(home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" }), { ...CONFIG, ...extra }, layout);
+        const list = one(element, ".list") as HTMLElement;
+        Object.defineProperty(list, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(list, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect(["fade-top", "fade-bottom"].filter((name) => list.classList.contains(name))).toEqual(expected);
+    });
+
+    it("lets go of the list's fade when the card goes from held to auto, and fades it again when held again", async () => {
+        const element = await card(home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" }), { ...CONFIG, height: 300 });
+        const list = one(element, ".list") as HTMLElement;
+        Object.defineProperty(list, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(list, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect([...list.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        element.setConfig({ type: "custom:updates-card", ...CONFIG } as UpdatesCardConfig);
+        await element.updateComplete;
+        expect([...list.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
+        element.setConfig({ type: "custom:updates-card", ...CONFIG, height: 300 } as UpdatesCardConfig);
+        await element.updateComplete;
+        expect([...list.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+    });
+
+    it("asks a sections view for the rows its header, one row and the bottom line need, and is never held lower", async () => {
+        const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, height: 100 });
+        expect(element.getGridOptions()).toMatchObject({ rows: "auto", min_rows: 3 });
+        expect(one(element, "ha-card")!.getAttribute("style")).toBe("height: 170px");
+    });
+
+    it.each([
         ["a maximum height", undefined, { max_height: 300 }, "max-height: 300px"],
+        ["a fixed height", undefined, { height_mode: "fixed" as const, height: 240, max_height: 300 }, "height: 240px"],
         ["grid rows in a sections view win over it", "grid", { max_height: 300, grid_options: { rows: 6 } }, "height: 100%"],
         ["automatic grid rows leave it in force", "grid", { max_height: 300, grid_options: { rows: "auto" } }, "max-height: 300px"],
         ["neither", undefined, {}, ""],
     ])("sizes itself by %s", async (_name, layout, extra, style) => {
         const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, ...extra }, layout);
         expect(one(element, "ha-card")!.getAttribute("style") ?? "").toBe(style);
+    });
+
+    it("refuses a height that isn't a positive number of pixels, and an unknown height mode, with an error about the height", () => {
+        const element = document.createElement("updates-card");
+        const config = (extra: Record<string, unknown>) => ({ type: "custom:updates-card", ...CONFIG, ...extra }) as UpdatesCardConfig;
+        const error = translate(browserLanguage(), "common.invalid_height");
+        expect(error).toMatch(/^Invalid height\./);
+        for (const value of ["300px", 0, -10]) {
+            expect(() => element.setConfig(config({ max_height: value }))).toThrow(error);
+            expect(() => element.setConfig(config({ height: value }))).toThrow(error);
+        }
+        expect(() => element.setConfig(config({ height_mode: "tall" }))).toThrow(error);
+        // Left empty in YAML, each is unset.
+        expect(() => element.setConfig(config({ height_mode: null, height: null, max_height: null }))).not.toThrow();
     });
 });
 

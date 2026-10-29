@@ -4,6 +4,7 @@
         "description": "Päivitysentiteetit ryhmittäin, yhdellä rivillä kun mitään ei ole odottamassa",
         "title": "Päivitykset",
         "invalid_configuration": "Virheelliset asetukset",
+        "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "no_entities": "Päivitysentiteettejä ei löytynyt",
         "all_current_count": "Kaikki ajan tasalla · {n}",
         "current_unreachable": "Ajan tasalla · {n} ei tavoitettavissa",
@@ -46,7 +47,14 @@
         "exclude_helper": "Päivitysentiteetit, joita ei koskaan näytetä tässä ryhmässä.",
         "install_action": "Päivitä kaikki",
         "install_action_helper": "Mitä Päivitä kaikki -painike tekee, esimerkiksi skripti, joka päivittää laitteet yksi kerrallaan. Jos jätät asetuksen tyhjäksi, Päivitä kaikki -painiketta ei näytetä.",
+        "height_mode": "Korkeus",
+        "height_mode_helper": "Osioihin jaetun näkymän asettelu-välilehdellä asetettu korkeus ohittaa tämän.",
+        "height_mode_auto": "Sisällön mukaan",
+        "height_mode_fixed": "Kiinteä",
+        "height_mode_max": "Kasvaa rajaan asti",
+        "height": "Kiinteä korkeus",
+        "height_helper": "Kortti on aina näin korkea, ja lista vierii sen sisällä.",
         "max_height": "Enimmäiskorkeus",
-        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lista vierii. Osioihin jaetun näkymän asettelu-välilehdellä asetettu korkeus ohittaa tämän."
+        "max_height_helper": "Kortti kasvaa sisältönsä mukana tähän korkeuteen asti, ja sen jälkeen lista vierii."
     }
 }

@@ -46,12 +46,14 @@ it, and offers to stop it.
 
 Every option can be set in the card's visual editor.
 
-| Name             | Type   | Description                                                                                                                                                                                 | Default                            |
-| ---------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `title`          | string | The card's title                                                                                                                                                                            | "Updates" in the viewer's language |
-| `groups`         | list   | The groups, each with the options below                                                                                                                                                     | Every update entity in one group   |
-| `install_action` | action | What the **Update all** button does, as any dashboard action. A script is followed while it runs (below). Without it, there is no such button                                               |                                    |
-| `max_height`     | number | The card's greatest height in pixels. The card grows with its content up to it, and then the list scrolls. A height in grid rows, set in the layout tab of a sections view, is used instead |                                    |
+| Name             | Type   | Description                                                                                                                                                                                                                                 | Default                                                                         |
+| ---------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `title`          | string | The card's title                                                                                                                                                                                                                            | "Updates" in the viewer's language                                              |
+| `groups`         | list   | The groups, each with the options below                                                                                                                                                                                                     | Every update entity in one group                                                |
+| `install_action` | action | What the **Update all** button does, as any dashboard action. A script is followed while it runs (below). Without it, there is no such button                                                                                               |                                                                                 |
+| `height_mode`    | string | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the list scrolls. A height in grid rows, set in the layout tab of a sections view, is used instead | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `height`         | number | The card's height in pixels, for `fixed`                                                                                                                                                                                                    |                                                                                 |
+| `max_height`     | number | The card's greatest height in pixels, for `max`                                                                                                                                                                                             |                                                                                 |
 
 A group holds the update entities of an integration, in some areas or outside them, or exactly the ones listed.
 
@@ -107,6 +109,10 @@ entity disabled. Such a device shows once its update entity is enabled in the de
 
 The card takes a whole section by default and can be made as narrow as half of one. Below 300 pixels, the **Update
 all** button shows only its icon. From 700 pixels on, the groups go side by side, two to a row.
+
+Held to a height, by `height_mode` or by rows in a sections view, the header, the status line and the line of those up
+to date stay in view and the groups scroll between them. The card never gets lower than these and one group's first
+row need, which is three rows in a sections view.
 
 ## Examples
 

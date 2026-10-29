@@ -1,4 +1,4 @@
-/*! updates-card 1.0.2 | MIT License */
+/*! updates-card 1.1.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,11 +711,173 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.0.2";
+var CARD_VERSION = "1.1.0";
 var FEATURE_INSTALL = 1;
 var BUNCH_MIN = 3;
 var DONE_KEEP = 5 * 6e4;
 var VERSION_WAIT = 3 * 6e4;
+
+// src/fade.ts
+var fadeStyles = i`
+    .fades {
+        --fade-length: min(24px, 25%);
+        scroll-padding-block: calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)) var(--fade-length, 24px);
+    }
+
+    .fade-top {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px))
+        );
+    }
+
+    .fade-bottom {
+        mask-image: linear-gradient(to top, transparent, #000 var(--fade-length, 24px));
+    }
+
+    .fade-top.fade-bottom {
+        mask-image: linear-gradient(
+            to bottom,
+            #000 var(--fade-top-offset, 0px),
+            transparent var(--fade-top-offset, 0px),
+            #000 calc(var(--fade-top-offset, 0px) + var(--fade-length, 24px)),
+            #000 calc(100% - var(--fade-length, 24px)),
+            transparent
+        );
+    }
+`;
+function markFade(part) {
+  const hidden = part.scrollHeight - part.clientHeight;
+  part.classList.toggle("fade-top", hidden > 1 && part.scrollTop > 1);
+  part.classList.toggle("fade-bottom", hidden > 1 && hidden - part.scrollTop > 1);
+}
+var onScroll = (event) => markFade(event.currentTarget);
+var ScrollFade = class {
+  constructor(host, parts) {
+    this.host = host;
+    this.parts = parts;
+    /** Each followed part with the children whose size it watches. */
+    this.followed = /* @__PURE__ */ new Map();
+    this.resized = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver((entries) => {
+      for (const { target } of entries) {
+        const part = this.followed.has(target) ? target : target.parentElement;
+        if (part && this.followed.has(part)) {
+          markFade(part);
+        }
+      }
+    });
+    host.addController(this);
+  }
+  hostConnected() {
+    if (this.host.hasUpdated) {
+      this.follow();
+    }
+  }
+  hostUpdated() {
+    if (this.host.isConnected) {
+      this.follow();
+    }
+  }
+  hostDisconnected() {
+    for (const part of [...this.followed.keys()]) {
+      this.forget(part);
+    }
+  }
+  follow() {
+    const now = new Set(this.parts());
+    for (const part of [...this.followed.keys()]) {
+      if (!now.has(part)) {
+        this.forget(part);
+      }
+    }
+    for (const part of now) {
+      if (!this.followed.has(part)) {
+        part.addEventListener("scroll", onScroll, { passive: true });
+        this.resized?.observe(part);
+      }
+      part.classList.add("fades");
+      const before = this.followed.get(part) ?? [];
+      const children = [...part.children];
+      before.filter((child) => !children.includes(child)).forEach((child) => this.resized?.unobserve(child));
+      children.filter((child) => !before.includes(child)).forEach((child) => this.resized?.observe(child));
+      this.followed.set(part, children);
+      markFade(part);
+    }
+  }
+  forget(part) {
+    this.followed.get(part)?.forEach((child) => this.resized?.unobserve(child));
+    this.followed.delete(part);
+    part.removeEventListener("scroll", onScroll);
+    this.resized?.unobserve(part);
+    part.classList.remove("fades", "fade-top", "fade-bottom");
+  }
+};
+
+// src/height.ts
+var HEIGHT_MODES = ["auto", "fixed", "max"];
+var pixels = (value) => value == null || typeof value === "number" && Number.isFinite(value) && value > 0;
+function validHeight(config) {
+  return (config.height_mode == null || HEIGHT_MODES.includes(config.height_mode)) && pixels(config.height) && pixels(config.max_height);
+}
+function heightMode(config) {
+  return config.height_mode ?? (config.height ? "fixed" : config.max_height ? "max" : "auto");
+}
+var ROW_HEIGHT = 56;
+var ROW_GAP = 8;
+function heightStyle(config, layout, minimum = 0) {
+  const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
+  if (layout === "grid" && typeof rows === "number") {
+    return "height: 100%";
+  }
+  const mode = heightMode(config);
+  if (mode === "fixed" && config.height) {
+    return `height: ${Math.max(config.height, minimum)}px`;
+  }
+  return mode === "max" && config.max_height ? `max-height: ${Math.max(config.max_height, minimum)}px` : "";
+}
+function gridMinRows(minimum) {
+  return Math.max(1, Math.ceil((minimum + ROW_GAP) / (ROW_HEIGHT + ROW_GAP)));
+}
+function heightCardSize(config, content, minimum = 0) {
+  const mode = heightMode(config);
+  if (mode === "fixed" && config.height) {
+    return Math.max(1, Math.round(Math.max(config.height, minimum) / 50));
+  }
+  return mode === "max" && config.max_height ? Math.max(1, Math.min(content, Math.round(Math.max(config.max_height, minimum) / 50))) : content;
+}
+function heightSchema(config, text) {
+  const mode = heightMode(config);
+  const field = (name) => ({
+    name,
+    selector: { number: { min: 100, max: 2e3, step: 10, unit_of_measurement: "px", mode: "box" } }
+  });
+  return [
+    {
+      name: "height_mode",
+      selector: {
+        select: { mode: "dropdown", options: HEIGHT_MODES.map((value) => ({ value, label: text(`editor.height_mode_${value}`) })) }
+      }
+    },
+    ...mode === "fixed" ? [field("height")] : mode === "max" ? [field("max_height")] : []
+  ];
+}
+function heightData(config) {
+  return { ...config, height_mode: heightMode(config) };
+}
+function tidyHeight(config) {
+  const tidied = { ...config };
+  for (const key of ["height", "max_height"]) {
+    if (!tidied[key]) {
+      delete tidied[key];
+    }
+  }
+  if (!tidied.height_mode || heightMode({ ...tidied, height_mode: void 0 }) === tidied.height_mode) {
+    delete tidied.height_mode;
+  }
+  return tidied;
+}
 
 // src/localize/languages/en.json
 var en_default = {
@@ -724,6 +886,7 @@ var en_default = {
     description: "Update entities in groups, folded to one line when nothing is waiting",
     title: "Updates",
     invalid_configuration: "Invalid configuration",
+    invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
     no_entities: "No update entities found",
     all_current_count: "All up to date \xB7 {n}",
     current_unreachable: "Up to date \xB7 {n} unreachable",
@@ -766,8 +929,15 @@ var en_default = {
     exclude_helper: "Update entities never shown in this group.",
     install_action: "Update all",
     install_action_helper: "What the Update all button does, such as a script that updates one device after another. Without it, there is no such button.",
+    height_mode: "Height",
+    height_mode_helper: "A height set in the layout tab of a sections view is used instead.",
+    height_mode_auto: "Fits the content",
+    height_mode_fixed: "Fixed",
+    height_mode_max: "Grows up to a limit",
+    height: "Fixed height",
+    height_helper: "The card is always this tall, and the list scrolls inside it.",
     max_height: "Maximum height",
-    max_height_helper: "The card grows with its content up to this height, and then the list scrolls. A height set in the layout tab of a sections view is used instead."
+    max_height_helper: "The card grows with its content up to this height, and then the list scrolls."
   }
 };
 
@@ -778,6 +948,7 @@ var fi_default = {
     description: "P\xE4ivitysentiteetit ryhmitt\xE4in, yhdell\xE4 rivill\xE4 kun mit\xE4\xE4n ei ole odottamassa",
     title: "P\xE4ivitykset",
     invalid_configuration: "Virheelliset asetukset",
+    invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
     no_entities: "P\xE4ivitysentiteettej\xE4 ei l\xF6ytynyt",
     all_current_count: "Kaikki ajan tasalla \xB7 {n}",
     current_unreachable: "Ajan tasalla \xB7 {n} ei tavoitettavissa",
@@ -820,8 +991,15 @@ var fi_default = {
     exclude_helper: "P\xE4ivitysentiteetit, joita ei koskaan n\xE4ytet\xE4 t\xE4ss\xE4 ryhm\xE4ss\xE4.",
     install_action: "P\xE4ivit\xE4 kaikki",
     install_action_helper: "Mit\xE4 P\xE4ivit\xE4 kaikki -painike tekee, esimerkiksi skripti, joka p\xE4ivitt\xE4\xE4 laitteet yksi kerrallaan. Jos j\xE4t\xE4t asetuksen tyhj\xE4ksi, P\xE4ivit\xE4 kaikki -painiketta ei n\xE4ytet\xE4.",
+    height_mode: "Korkeus",
+    height_mode_helper: "Osioihin jaetun n\xE4kym\xE4n asettelu-v\xE4lilehdell\xE4 asetettu korkeus ohittaa t\xE4m\xE4n.",
+    height_mode_auto: "Sis\xE4ll\xF6n mukaan",
+    height_mode_fixed: "Kiinte\xE4",
+    height_mode_max: "Kasvaa rajaan asti",
+    height: "Kiinte\xE4 korkeus",
+    height_helper: "Kortti on aina n\xE4in korkea, ja lista vierii sen sis\xE4ll\xE4.",
     max_height: "Enimm\xE4iskorkeus",
-    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen lista vierii. Osioihin jaetun n\xE4kym\xE4n asettelu-v\xE4lilehdell\xE4 asetettu korkeus ohittaa t\xE4m\xE4n."
+    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen lista vierii."
   }
 };
 
@@ -994,7 +1172,7 @@ function statusOf(row, install, now) {
 }
 
 // src/editor.ts
-function schema(hass, text) {
+function schema(hass, config, text) {
   const field = (name, selector) => ({
     label: text(`editor.${name}`),
     description: text(`editor.${name}_helper`),
@@ -1022,7 +1200,7 @@ function schema(hass, text) {
       }
     },
     { name: "install_action", selector: { ui_action: { actions: ["perform-action", "navigate", "url"] } } },
-    { name: "max_height", selector: { number: { min: 100, max: 2e3, step: 10, unit_of_measurement: "px", mode: "box" } } }
+    ...heightSchema(config, text)
   ];
 }
 var UpdatesCardEditor = class extends i4 {
@@ -1040,8 +1218,8 @@ var UpdatesCardEditor = class extends i4 {
     return b2`
             <ha-form
                 .hass=${this.hass}
-                .data=${this.config}
-                .schema=${schema(this.hass, (key) => this.text(key))}
+                .data=${heightData(this.config)}
+                .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
                 @value-changed=${this.valueChanged}
@@ -1049,12 +1227,12 @@ var UpdatesCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = { ...event.detail.value };
+    const config = tidyHeight(event.detail.value);
     const empty = (value) => value === void 0 || value === null || String(value) === "" || Array.isArray(value) && value.length === 0;
     if (config.groups) {
       config.groups = config.groups.map((group) => Object.fromEntries(Object.entries(group).filter(([, value]) => !empty(value))));
     }
-    for (const key of ["title", "groups", "install_action", "max_height"]) {
+    for (const key of ["title", "groups", "install_action"]) {
       if (empty(config[key])) {
         delete config[key];
       }
@@ -1110,7 +1288,7 @@ function installAction(config) {
 }
 var UpdatesCard = class extends i4 {
   constructor() {
-    super(...arguments);
+    super();
     this.open = false;
     this.opened = /* @__PURE__ */ new Set();
     this.installs = /* @__PURE__ */ new Map();
@@ -1122,6 +1300,7 @@ var UpdatesCard = class extends i4 {
     /** The entities whose changes matter: the rows, their devices' other entities and the script. */
     this.watched = [];
     this.siblings = /* @__PURE__ */ new Map();
+    new ScrollFade(this, () => this.heightStyle() ? this.renderRoot.querySelectorAll(".list") : []);
   }
   static getConfigElement() {
     return document.createElement("updates-card-editor");
@@ -1133,14 +1312,21 @@ var UpdatesCard = class extends i4 {
     if (!config || config.groups !== void 0 && !Array.isArray(config.groups)) {
       throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
     }
+    if (!validHeight(config)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_height"));
+    }
     this.config = { ...config };
   }
   getCardSize() {
     const waiting = this.groupList.flatMap((g2) => g2.rows).filter((r6) => r6.pending).length;
-    return waiting === 0 ? 1 : 2 + Math.min(waiting, 6);
+    return heightCardSize(this.config ?? {}, waiting === 0 ? 1 : 2 + Math.min(waiting, 6), this.minimumHeight());
   }
   getGridOptions() {
-    return { columns: 12, min_columns: 6, rows: "auto" };
+    return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+  }
+  /** Held to a height, the header, the status line, one group's first row and the line of those up to date still fit. */
+  minimumHeight() {
+    return 170;
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1546,13 +1732,8 @@ var UpdatesCard = class extends i4 {
     }
     this.opened = opened;
   }
-  /** The card's height: the grid rows of a sections view when set there, otherwise up to `max_height`. */
   heightStyle() {
-    const rows = this.config?.grid_options?.rows;
-    if (this.layout === "grid" && typeof rows === "number") {
-      return "height: 100%";
-    }
-    return this.config?.max_height ? `max-height: ${this.config.max_height}px` : "";
+    return heightStyle(this.config ?? {}, this.layout, this.minimumHeight());
   }
   async install(event, row) {
     event.stopPropagation();
@@ -1607,507 +1788,510 @@ var UpdatesCard = class extends i4 {
     return this.hass?.locale?.language ?? this.hass?.language ?? browserLanguage();
   }
   static get styles() {
-    return i`
-            /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
-            ha-card {
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                container-type: inline-size;
-                --uc-soft: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
-                --uc-track: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.08);
-            }
-
-            button {
-                font: inherit;
-                color: inherit;
-                background: none;
-                border: 0;
-                padding: 0;
-                text-align: left;
-                cursor: pointer;
-            }
-
-            button:focus-visible,
-            .row:focus-visible {
-                outline: 2px solid var(--primary-color);
-                outline-offset: -2px;
-            }
-
-            .hd {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 12px 12px 0 16px;
-            }
-
-            .hd-title {
-                flex: 1 1 auto;
-                min-width: 0;
-                font-size: var(--ha-card-header-font-size, 18px);
-                line-height: 1.4;
-            }
-
-            .hd-sub {
-                flex: none;
-                padding: 0 16px 2px;
-                font-size: 12px;
-            }
-
-            .message {
-                padding: 4px 16px 14px;
-                font-size: 12px;
-                color: var(--secondary-text-color);
-            }
-
-            /* The card's one call to action, so it looks like one on any theme. */
-            .action {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                font-size: 12.5px;
-                font-weight: 500;
-                color: var(--text-primary-color, #fff);
-                background: var(--primary-color);
-                border-radius: 16px;
-                padding: 5px 12px;
-                white-space: nowrap;
-                --mdc-icon-size: 16px;
-            }
-
-            .action ha-icon {
-                display: none;
-            }
-
-            .action.ghost {
-                color: var(--primary-text-color);
-                background: var(--uc-track);
-            }
-
-            .action.ghost ha-icon {
-                display: inline-flex;
-            }
-
-            .action:disabled {
-                opacity: 0.5;
-                cursor: default;
-            }
-
-            .bar {
-                flex: none;
-                display: flex;
-                gap: 3px;
-                margin: 8px 16px 0;
-            }
-
-            .seg {
-                flex: 1 1 0;
-                height: 4px;
-                border-radius: 2px;
-                background: color-mix(in srgb, var(--secondary-text-color) 35%, transparent);
-            }
-
-            .seg.running {
-                background: var(--primary-color);
-                opacity: 0.6;
-            }
-
-            .seg.done {
-                background: var(--success-color, #43a047);
-            }
-
-            .list {
-                flex: 1 1 auto;
-                min-height: 0;
-                overflow-y: auto;
-                overscroll-behavior: contain;
-                scrollbar-width: thin;
-            }
-
-            .cols {
-                padding: 6px 0 4px;
-            }
-
-            .fold {
-                display: grid;
-                grid-template-rows: 0fr;
-                min-width: 0;
-                transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
-            }
-
-            .fold.open {
-                grid-template-rows: 1fr;
-            }
-
-            .fold-in {
-                min-height: 0;
-                overflow: hidden;
-            }
-
-            /* Side by side when there is room, each group laid out by its own width. */
-            .group {
-                container-type: inline-size;
-                min-width: 0;
-            }
-
-            @container (min-width: 700px) {
-                .cols {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    column-gap: 8px;
-                    align-items: start;
+    return [
+      i`
+                /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
+                ha-card {
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    container-type: inline-size;
+                    --uc-soft: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
+                    --uc-track: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.08);
                 }
 
-                /* A group with nothing waiting, while shut, leaves its column to those that have something. */
-                .cols > .fold:not(.open) {
-                    order: 1;
-                }
-            }
-
-            .grp-h {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 10px 12px 2px 16px;
-                font-size: 12px;
-                font-weight: 500;
-                letter-spacing: 0.02em;
-                text-transform: uppercase;
-                color: var(--secondary-text-color);
-            }
-
-            .grp-h .n {
-                font-weight: 400;
-            }
-
-            .grp-body {
-                margin-left: 16px;
-                border-left: 2px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-            }
-
-            .grp-body .row {
-                padding-left: 12px;
-            }
-
-            .row,
-            .sum {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 3px 12px 3px 16px;
-                min-height: 40px;
-                cursor: pointer;
-            }
-
-            .sum {
-                min-height: 44px;
-            }
-
-            .chev {
-                flex: none;
-                --mdc-icon-size: 20px;
-                color: var(--secondary-text-color);
-            }
-
-            .info {
-                flex: 1 1 auto;
-                min-width: 0;
-                display: block;
-            }
-
-            /* Names and versions wrap rather than being cut. */
-            .name,
-            .ver {
-                display: block;
-                line-height: 1.3;
-                overflow-wrap: anywhere;
-            }
-
-            .name {
-                font-size: 14px;
-            }
-
-            .ver {
-                font-family: var(--ha-font-family-code, ui-monospace, monospace);
-                font-size: 11.5px;
-                color: var(--secondary-text-color);
-            }
-
-            .ver .new {
-                color: var(--primary-color);
-                font-weight: 500;
-            }
-
-            .end {
-                flex: none;
-                max-width: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                color: var(--secondary-text-color);
-            }
-
-            .muted {
-                opacity: 0.62;
-            }
-
-            .count {
-                font-size: 11px;
-                color: var(--secondary-text-color);
-                background: var(--uc-track);
-                border-radius: 8px;
-                padding: 0 6px;
-                margin-left: 6px;
-                vertical-align: 1px;
-                white-space: nowrap;
-            }
-
-            .install {
-                width: 30px;
-                height: 30px;
-                border-radius: 50%;
-                background: color-mix(in srgb, var(--primary-color) 30%, transparent);
-                color: var(--primary-text-color);
-                display: grid;
-                place-items: center;
-                --mdc-icon-size: 17px;
-            }
-
-            .install:disabled {
-                opacity: 0.35;
-                cursor: default;
-            }
-
-            .pill {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 11px;
-                font-weight: 500;
-                border-radius: 10px;
-                padding: 1px 8px;
-                white-space: nowrap;
-                --mdc-icon-size: 12px;
-            }
-
-            .pill.running {
-                background: var(--uc-soft);
-                color: var(--primary-color);
-            }
-
-            .pill.done {
-                background: rgba(var(--rgb-success-color, 67, 160, 71), 0.12);
-                color: var(--success-color, #43a047);
-            }
-
-            .pill.failed {
-                background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
-                color: var(--error-color, #db4437);
-            }
-
-            .pill.off {
-                background: var(--uc-track);
-                color: var(--secondary-text-color);
-            }
-
-            .spin {
-                animation: spin 1.4s linear infinite;
-            }
-
-            @keyframes spin {
-                to {
-                    transform: rotate(360deg);
-                }
-            }
-
-            .errline {
-                margin: 0 12px 6px 12px;
-                padding: 6px 9px;
-                border-radius: 8px;
-                font-size: 12px;
-                color: var(--error-color, #db4437);
-                background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
-            }
-
-            .row.sib {
-                min-height: 26px;
-                padding-top: 1px;
-                padding-bottom: 1px;
-                flex-wrap: wrap;
-                row-gap: 0;
-            }
-
-            .row.sib .name {
-                font-size: 13px;
-            }
-
-            .row.sib .info {
-                flex: 1 0 auto;
-                max-width: 100%;
-            }
-
-            .row.sib .end {
-                margin-left: auto;
-                max-width: 100%;
-            }
-
-            /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
-            .off-line {
-                --uc-inset: 16px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                box-sizing: border-box;
-                margin-top: 6px;
-                padding: 10px 12px 2px var(--uc-inset);
-                background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12))) no-repeat
-                    left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
-                font-size: 12px;
-                color: var(--secondary-text-color);
-                opacity: 0.8;
-                --mdc-icon-size: 16px;
-            }
-
-            .off-state {
-                font-size: 11.5px;
-                white-space: nowrap;
-            }
-
-            .grow {
-                flex: 1 1 auto;
-            }
-
-            .switch {
-                flex: none;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                box-sizing: border-box;
-                border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-                padding: 9px 16px;
-                font-size: 12.5px;
-                color: var(--secondary-text-color);
-            }
-
-            /* The whole card as one line while nothing waits. */
-            .one {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 12px 12px 12px 16px;
-            }
-
-            .one .ok {
-                flex: none;
-                color: var(--success-color, #43a047);
-            }
-
-            .one-title {
-                flex: 1 1 auto;
-                min-width: 0;
-                font-size: 16px;
-                overflow-wrap: anywhere;
-            }
-
-            .one-sum {
-                font-size: 12.5px;
-                color: var(--secondary-text-color);
-                text-align: right;
-            }
-
-            /* A narrow card gives the rows the room its indents would take, and the title the room of the button's text. */
-            @container (max-width: 300px) {
-                .hd,
-                .row,
-                .sum,
-                .one,
-                .grp-h {
-                    padding-left: 10px;
-                }
-
-                .off-line {
-                    --uc-inset: 10px;
-                }
-
-                .hd-sub,
-                .switch {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                }
-
-                .bar {
-                    margin-left: 10px;
-                    margin-right: 10px;
-                }
-
-                .grp-body {
-                    margin-left: 10px;
-                }
-
-                .grp-body .row {
-                    padding-left: 8px;
-                }
-
-                .one {
-                    flex-wrap: wrap;
-                    row-gap: 2px;
-                }
-
-                .action {
-                    width: 32px;
-                    height: 32px;
+                button {
+                    font: inherit;
+                    color: inherit;
+                    background: none;
+                    border: 0;
                     padding: 0;
-                    border-radius: 50%;
-                    justify-content: center;
-                    --mdc-icon-size: 18px;
+                    text-align: left;
+                    cursor: pointer;
+                }
+
+                button:focus-visible,
+                .row:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: -2px;
+                }
+
+                .hd {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px 12px 0 16px;
+                }
+
+                .hd-title {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    font-size: var(--ha-card-header-font-size, 18px);
+                    line-height: 1.4;
+                }
+
+                .hd-sub {
+                    flex: none;
+                    padding: 0 16px 2px;
+                    font-size: 12px;
+                }
+
+                .message {
+                    padding: 4px 16px 14px;
+                    font-size: 12px;
+                    color: var(--secondary-text-color);
+                }
+
+                /* The card's one call to action, so it looks like one on any theme. */
+                .action {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 12.5px;
+                    font-weight: 500;
+                    color: var(--text-primary-color, #fff);
+                    background: var(--primary-color);
+                    border-radius: 16px;
+                    padding: 5px 12px;
+                    white-space: nowrap;
+                    --mdc-icon-size: 16px;
                 }
 
                 .action ha-icon {
+                    display: none;
+                }
+
+                .action.ghost {
+                    color: var(--primary-text-color);
+                    background: var(--uc-track);
+                }
+
+                .action.ghost ha-icon {
                     display: inline-flex;
                 }
 
-                .action span {
-                    display: none;
+                .action:disabled {
+                    opacity: 0.5;
+                    cursor: default;
                 }
-            }
 
-            /* A wide group has room for a waiting row's versions beside its name. */
-            @container (min-width: 600px) {
-                .row:not(.sib) .info,
-                .sum .info {
+                .bar {
+                    flex: none;
                     display: flex;
-                    align-items: baseline;
-                    justify-content: space-between;
-                    gap: 16px;
+                    gap: 3px;
+                    margin: 8px 16px 0;
                 }
 
-                .row:not(.sib) .ver,
-                .sum .ver {
-                    text-align: right;
+                .seg {
+                    flex: 1 1 0;
+                    height: 4px;
+                    border-radius: 2px;
+                    background: color-mix(in srgb, var(--secondary-text-color) 35%, transparent);
                 }
-            }
 
-            @media (prefers-reduced-motion: reduce) {
-                .spin {
-                    animation: none;
+                .seg.running {
+                    background: var(--primary-color);
+                    opacity: 0.6;
+                }
+
+                .seg.done {
+                    background: var(--success-color, #43a047);
+                }
+
+                .list {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    scrollbar-width: thin;
+                }
+
+                .cols {
+                    padding: 6px 0 4px;
                 }
 
                 .fold {
-                    transition: none;
+                    display: grid;
+                    grid-template-rows: 0fr;
+                    min-width: 0;
+                    transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
                 }
-            }
-        `;
+
+                .fold.open {
+                    grid-template-rows: 1fr;
+                }
+
+                .fold-in {
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+                /* Side by side when there is room, each group laid out by its own width. */
+                .group {
+                    container-type: inline-size;
+                    min-width: 0;
+                }
+
+                @container (min-width: 700px) {
+                    .cols {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        column-gap: 8px;
+                        align-items: start;
+                    }
+
+                    /* A group with nothing waiting, while shut, leaves its column to those that have something. */
+                    .cols > .fold:not(.open) {
+                        order: 1;
+                    }
+                }
+
+                .grp-h {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 12px 2px 16px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    letter-spacing: 0.02em;
+                    text-transform: uppercase;
+                    color: var(--secondary-text-color);
+                }
+
+                .grp-h .n {
+                    font-weight: 400;
+                }
+
+                .grp-body {
+                    margin-left: 16px;
+                    border-left: 2px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+                }
+
+                .grp-body .row {
+                    padding-left: 12px;
+                }
+
+                .row,
+                .sum {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    padding: 3px 12px 3px 16px;
+                    min-height: 40px;
+                    cursor: pointer;
+                }
+
+                .sum {
+                    min-height: 44px;
+                }
+
+                .chev {
+                    flex: none;
+                    --mdc-icon-size: 20px;
+                    color: var(--secondary-text-color);
+                }
+
+                .info {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    display: block;
+                }
+
+                /* Names and versions wrap rather than being cut. */
+                .name,
+                .ver {
+                    display: block;
+                    line-height: 1.3;
+                    overflow-wrap: anywhere;
+                }
+
+                .name {
+                    font-size: 14px;
+                }
+
+                .ver {
+                    font-family: var(--ha-font-family-code, ui-monospace, monospace);
+                    font-size: 11.5px;
+                    color: var(--secondary-text-color);
+                }
+
+                .ver .new {
+                    color: var(--primary-color);
+                    font-weight: 500;
+                }
+
+                .end {
+                    flex: none;
+                    max-width: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    color: var(--secondary-text-color);
+                }
+
+                .muted {
+                    opacity: 0.62;
+                }
+
+                .count {
+                    font-size: 11px;
+                    color: var(--secondary-text-color);
+                    background: var(--uc-track);
+                    border-radius: 8px;
+                    padding: 0 6px;
+                    margin-left: 6px;
+                    vertical-align: 1px;
+                    white-space: nowrap;
+                }
+
+                .install {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    background: color-mix(in srgb, var(--primary-color) 30%, transparent);
+                    color: var(--primary-text-color);
+                    display: grid;
+                    place-items: center;
+                    --mdc-icon-size: 17px;
+                }
+
+                .install:disabled {
+                    opacity: 0.35;
+                    cursor: default;
+                }
+
+                .pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    border-radius: 10px;
+                    padding: 1px 8px;
+                    white-space: nowrap;
+                    --mdc-icon-size: 12px;
+                }
+
+                .pill.running {
+                    background: var(--uc-soft);
+                    color: var(--primary-color);
+                }
+
+                .pill.done {
+                    background: rgba(var(--rgb-success-color, 67, 160, 71), 0.12);
+                    color: var(--success-color, #43a047);
+                }
+
+                .pill.failed {
+                    background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                    color: var(--error-color, #db4437);
+                }
+
+                .pill.off {
+                    background: var(--uc-track);
+                    color: var(--secondary-text-color);
+                }
+
+                .spin {
+                    animation: spin 1.4s linear infinite;
+                }
+
+                @keyframes spin {
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+
+                .errline {
+                    margin: 0 12px 6px 12px;
+                    padding: 6px 9px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: var(--error-color, #db4437);
+                    background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                }
+
+                .row.sib {
+                    min-height: 26px;
+                    padding-top: 1px;
+                    padding-bottom: 1px;
+                    flex-wrap: wrap;
+                    row-gap: 0;
+                }
+
+                .row.sib .name {
+                    font-size: 13px;
+                }
+
+                .row.sib .info {
+                    flex: 1 0 auto;
+                    max-width: 100%;
+                }
+
+                .row.sib .end {
+                    margin-left: auto;
+                    max-width: 100%;
+                }
+
+                /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
+                .off-line {
+                    --uc-inset: 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    margin-top: 6px;
+                    padding: 10px 12px 2px var(--uc-inset);
+                    background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12)))
+                        no-repeat left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
+                    font-size: 12px;
+                    color: var(--secondary-text-color);
+                    opacity: 0.8;
+                    --mdc-icon-size: 16px;
+                }
+
+                .off-state {
+                    font-size: 11.5px;
+                    white-space: nowrap;
+                }
+
+                .grow {
+                    flex: 1 1 auto;
+                }
+
+                .switch {
+                    flex: none;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+                    padding: 9px 16px;
+                    font-size: 12.5px;
+                    color: var(--secondary-text-color);
+                }
+
+                /* The whole card as one line while nothing waits. */
+                .one {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    padding: 12px 12px 12px 16px;
+                }
+
+                .one .ok {
+                    flex: none;
+                    color: var(--success-color, #43a047);
+                }
+
+                .one-title {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    font-size: 16px;
+                    overflow-wrap: anywhere;
+                }
+
+                .one-sum {
+                    font-size: 12.5px;
+                    color: var(--secondary-text-color);
+                    text-align: right;
+                }
+
+                /* A narrow card gives the rows the room its indents would take, and the title the room of the button's text. */
+                @container (max-width: 300px) {
+                    .hd,
+                    .row,
+                    .sum,
+                    .one,
+                    .grp-h {
+                        padding-left: 10px;
+                    }
+
+                    .off-line {
+                        --uc-inset: 10px;
+                    }
+
+                    .hd-sub,
+                    .switch {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                    }
+
+                    .bar {
+                        margin-left: 10px;
+                        margin-right: 10px;
+                    }
+
+                    .grp-body {
+                        margin-left: 10px;
+                    }
+
+                    .grp-body .row {
+                        padding-left: 8px;
+                    }
+
+                    .one {
+                        flex-wrap: wrap;
+                        row-gap: 2px;
+                    }
+
+                    .action {
+                        width: 32px;
+                        height: 32px;
+                        padding: 0;
+                        border-radius: 50%;
+                        justify-content: center;
+                        --mdc-icon-size: 18px;
+                    }
+
+                    .action ha-icon {
+                        display: inline-flex;
+                    }
+
+                    .action span {
+                        display: none;
+                    }
+                }
+
+                /* A wide group has room for a waiting row's versions beside its name. */
+                @container (min-width: 600px) {
+                    .row:not(.sib) .info,
+                    .sum .info {
+                        display: flex;
+                        align-items: baseline;
+                        justify-content: space-between;
+                        gap: 16px;
+                    }
+
+                    .row:not(.sib) .ver,
+                    .sum .ver {
+                        text-align: right;
+                    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .spin {
+                        animation: none;
+                    }
+
+                    .fold {
+                        transition: none;
+                    }
+                }
+            `,
+      fadeStyles
+    ];
   }
 };
 __decorateClass([

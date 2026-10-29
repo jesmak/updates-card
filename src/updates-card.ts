@@ -13,8 +13,10 @@ import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 
 import { CARD_VERSION, DONE_KEEP } from "./const";
+import { ScrollFade, fadeStyles } from "./fade";
 import "./editor";
 import type { HomeAssistant } from "./hass";
+import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import type { ActionConfig, Bunch, Group, Row, UpdatesCardConfig } from "./types";
 import { bunchesOf, groupsOf, scriptOf, statusOf } from "./updates";
@@ -90,6 +92,12 @@ export class UpdatesCard extends LitElement {
     private siblings = new Map<string, string[]>();
     private siblingsOf?: HomeAssistant["entities"];
 
+    constructor() {
+        super();
+        // Fades the list's edges while the card is held to a height, through the card's own lifecycle.
+        new ScrollFade(this, () => (this.heightStyle() ? this.renderRoot.querySelectorAll<HTMLElement>(".list") : []));
+    }
+
     public static getConfigElement(): HTMLElement {
         return document.createElement("updates-card-editor");
     }
@@ -102,16 +110,24 @@ export class UpdatesCard extends LitElement {
         if (!config || (config.groups !== undefined && !Array.isArray(config.groups))) {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
+        if (!validHeight(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_height"));
+        }
         this.config = { ...config };
     }
 
     public getCardSize(): number {
         const waiting = this.groupList.flatMap((g) => g.rows).filter((r) => r.pending).length;
-        return waiting === 0 ? 1 : 2 + Math.min(waiting, 6);
+        return heightCardSize(this.config ?? {}, waiting === 0 ? 1 : 2 + Math.min(waiting, 6), this.minimumHeight());
     }
 
     public getGridOptions(): Record<string, unknown> {
-        return { columns: 12, min_columns: 6, rows: "auto" };
+        return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
+    }
+
+    /** Held to a height, the header, the status line, one group's first row and the line of those up to date still fit. */
+    private minimumHeight(): number {
+        return 170;
     }
 
     public connectedCallback(): void {
@@ -582,13 +598,8 @@ export class UpdatesCard extends LitElement {
         this.opened = opened;
     }
 
-    /** The card's height: the grid rows of a sections view when set there, otherwise up to `max_height`. */
     private heightStyle(): string {
-        const rows = (this.config?.grid_options as { rows?: unknown } | undefined)?.rows;
-        if (this.layout === "grid" && typeof rows === "number") {
-            return "height: 100%";
-        }
-        return this.config?.max_height ? `max-height: ${this.config.max_height}px` : "";
+        return heightStyle(this.config ?? {}, this.layout, this.minimumHeight());
     }
 
     private async install(event: Event, row: Row): Promise<void> {
@@ -652,507 +663,510 @@ export class UpdatesCard extends LitElement {
     }
 
     static get styles(): CSSResultGroup {
-        return css`
-            /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
-            ha-card {
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                container-type: inline-size;
-                --uc-soft: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
-                --uc-track: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.08);
-            }
-
-            button {
-                font: inherit;
-                color: inherit;
-                background: none;
-                border: 0;
-                padding: 0;
-                text-align: left;
-                cursor: pointer;
-            }
-
-            button:focus-visible,
-            .row:focus-visible {
-                outline: 2px solid var(--primary-color);
-                outline-offset: -2px;
-            }
-
-            .hd {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                padding: 12px 12px 0 16px;
-            }
-
-            .hd-title {
-                flex: 1 1 auto;
-                min-width: 0;
-                font-size: var(--ha-card-header-font-size, 18px);
-                line-height: 1.4;
-            }
-
-            .hd-sub {
-                flex: none;
-                padding: 0 16px 2px;
-                font-size: 12px;
-            }
-
-            .message {
-                padding: 4px 16px 14px;
-                font-size: 12px;
-                color: var(--secondary-text-color);
-            }
-
-            /* The card's one call to action, so it looks like one on any theme. */
-            .action {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                font-size: 12.5px;
-                font-weight: 500;
-                color: var(--text-primary-color, #fff);
-                background: var(--primary-color);
-                border-radius: 16px;
-                padding: 5px 12px;
-                white-space: nowrap;
-                --mdc-icon-size: 16px;
-            }
-
-            .action ha-icon {
-                display: none;
-            }
-
-            .action.ghost {
-                color: var(--primary-text-color);
-                background: var(--uc-track);
-            }
-
-            .action.ghost ha-icon {
-                display: inline-flex;
-            }
-
-            .action:disabled {
-                opacity: 0.5;
-                cursor: default;
-            }
-
-            .bar {
-                flex: none;
-                display: flex;
-                gap: 3px;
-                margin: 8px 16px 0;
-            }
-
-            .seg {
-                flex: 1 1 0;
-                height: 4px;
-                border-radius: 2px;
-                background: color-mix(in srgb, var(--secondary-text-color) 35%, transparent);
-            }
-
-            .seg.running {
-                background: var(--primary-color);
-                opacity: 0.6;
-            }
-
-            .seg.done {
-                background: var(--success-color, #43a047);
-            }
-
-            .list {
-                flex: 1 1 auto;
-                min-height: 0;
-                overflow-y: auto;
-                overscroll-behavior: contain;
-                scrollbar-width: thin;
-            }
-
-            .cols {
-                padding: 6px 0 4px;
-            }
-
-            .fold {
-                display: grid;
-                grid-template-rows: 0fr;
-                min-width: 0;
-                transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
-            }
-
-            .fold.open {
-                grid-template-rows: 1fr;
-            }
-
-            .fold-in {
-                min-height: 0;
-                overflow: hidden;
-            }
-
-            /* Side by side when there is room, each group laid out by its own width. */
-            .group {
-                container-type: inline-size;
-                min-width: 0;
-            }
-
-            @container (min-width: 700px) {
-                .cols {
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    column-gap: 8px;
-                    align-items: start;
+        return [
+            css`
+                /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
+                ha-card {
+                    box-sizing: border-box;
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                    container-type: inline-size;
+                    --uc-soft: rgba(var(--rgb-primary-color, 3, 169, 244), 0.12);
+                    --uc-track: rgba(var(--rgb-primary-text-color, 33, 33, 33), 0.08);
                 }
 
-                /* A group with nothing waiting, while shut, leaves its column to those that have something. */
-                .cols > .fold:not(.open) {
-                    order: 1;
-                }
-            }
-
-            .grp-h {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                padding: 10px 12px 2px 16px;
-                font-size: 12px;
-                font-weight: 500;
-                letter-spacing: 0.02em;
-                text-transform: uppercase;
-                color: var(--secondary-text-color);
-            }
-
-            .grp-h .n {
-                font-weight: 400;
-            }
-
-            .grp-body {
-                margin-left: 16px;
-                border-left: 2px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-            }
-
-            .grp-body .row {
-                padding-left: 12px;
-            }
-
-            .row,
-            .sum {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 3px 12px 3px 16px;
-                min-height: 40px;
-                cursor: pointer;
-            }
-
-            .sum {
-                min-height: 44px;
-            }
-
-            .chev {
-                flex: none;
-                --mdc-icon-size: 20px;
-                color: var(--secondary-text-color);
-            }
-
-            .info {
-                flex: 1 1 auto;
-                min-width: 0;
-                display: block;
-            }
-
-            /* Names and versions wrap rather than being cut. */
-            .name,
-            .ver {
-                display: block;
-                line-height: 1.3;
-                overflow-wrap: anywhere;
-            }
-
-            .name {
-                font-size: 14px;
-            }
-
-            .ver {
-                font-family: var(--ha-font-family-code, ui-monospace, monospace);
-                font-size: 11.5px;
-                color: var(--secondary-text-color);
-            }
-
-            .ver .new {
-                color: var(--primary-color);
-                font-weight: 500;
-            }
-
-            .end {
-                flex: none;
-                max-width: 50%;
-                display: flex;
-                align-items: center;
-                justify-content: flex-end;
-                color: var(--secondary-text-color);
-            }
-
-            .muted {
-                opacity: 0.62;
-            }
-
-            .count {
-                font-size: 11px;
-                color: var(--secondary-text-color);
-                background: var(--uc-track);
-                border-radius: 8px;
-                padding: 0 6px;
-                margin-left: 6px;
-                vertical-align: 1px;
-                white-space: nowrap;
-            }
-
-            .install {
-                width: 30px;
-                height: 30px;
-                border-radius: 50%;
-                background: color-mix(in srgb, var(--primary-color) 30%, transparent);
-                color: var(--primary-text-color);
-                display: grid;
-                place-items: center;
-                --mdc-icon-size: 17px;
-            }
-
-            .install:disabled {
-                opacity: 0.35;
-                cursor: default;
-            }
-
-            .pill {
-                display: inline-flex;
-                align-items: center;
-                gap: 3px;
-                font-size: 11px;
-                font-weight: 500;
-                border-radius: 10px;
-                padding: 1px 8px;
-                white-space: nowrap;
-                --mdc-icon-size: 12px;
-            }
-
-            .pill.running {
-                background: var(--uc-soft);
-                color: var(--primary-color);
-            }
-
-            .pill.done {
-                background: rgba(var(--rgb-success-color, 67, 160, 71), 0.12);
-                color: var(--success-color, #43a047);
-            }
-
-            .pill.failed {
-                background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
-                color: var(--error-color, #db4437);
-            }
-
-            .pill.off {
-                background: var(--uc-track);
-                color: var(--secondary-text-color);
-            }
-
-            .spin {
-                animation: spin 1.4s linear infinite;
-            }
-
-            @keyframes spin {
-                to {
-                    transform: rotate(360deg);
-                }
-            }
-
-            .errline {
-                margin: 0 12px 6px 12px;
-                padding: 6px 9px;
-                border-radius: 8px;
-                font-size: 12px;
-                color: var(--error-color, #db4437);
-                background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
-            }
-
-            .row.sib {
-                min-height: 26px;
-                padding-top: 1px;
-                padding-bottom: 1px;
-                flex-wrap: wrap;
-                row-gap: 0;
-            }
-
-            .row.sib .name {
-                font-size: 13px;
-            }
-
-            .row.sib .info {
-                flex: 1 0 auto;
-                max-width: 100%;
-            }
-
-            .row.sib .end {
-                margin-left: auto;
-                max-width: 100%;
-            }
-
-            /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
-            .off-line {
-                --uc-inset: 16px;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                box-sizing: border-box;
-                margin-top: 6px;
-                padding: 10px 12px 2px var(--uc-inset);
-                background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12))) no-repeat
-                    left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
-                font-size: 12px;
-                color: var(--secondary-text-color);
-                opacity: 0.8;
-                --mdc-icon-size: 16px;
-            }
-
-            .off-state {
-                font-size: 11.5px;
-                white-space: nowrap;
-            }
-
-            .grow {
-                flex: 1 1 auto;
-            }
-
-            .switch {
-                flex: none;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                gap: 8px;
-                width: 100%;
-                box-sizing: border-box;
-                border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
-                padding: 9px 16px;
-                font-size: 12.5px;
-                color: var(--secondary-text-color);
-            }
-
-            /* The whole card as one line while nothing waits. */
-            .one {
-                flex: none;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                width: 100%;
-                box-sizing: border-box;
-                padding: 12px 12px 12px 16px;
-            }
-
-            .one .ok {
-                flex: none;
-                color: var(--success-color, #43a047);
-            }
-
-            .one-title {
-                flex: 1 1 auto;
-                min-width: 0;
-                font-size: 16px;
-                overflow-wrap: anywhere;
-            }
-
-            .one-sum {
-                font-size: 12.5px;
-                color: var(--secondary-text-color);
-                text-align: right;
-            }
-
-            /* A narrow card gives the rows the room its indents would take, and the title the room of the button's text. */
-            @container (max-width: 300px) {
-                .hd,
-                .row,
-                .sum,
-                .one,
-                .grp-h {
-                    padding-left: 10px;
-                }
-
-                .off-line {
-                    --uc-inset: 10px;
-                }
-
-                .hd-sub,
-                .switch {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                }
-
-                .bar {
-                    margin-left: 10px;
-                    margin-right: 10px;
-                }
-
-                .grp-body {
-                    margin-left: 10px;
-                }
-
-                .grp-body .row {
-                    padding-left: 8px;
-                }
-
-                .one {
-                    flex-wrap: wrap;
-                    row-gap: 2px;
-                }
-
-                .action {
-                    width: 32px;
-                    height: 32px;
+                button {
+                    font: inherit;
+                    color: inherit;
+                    background: none;
+                    border: 0;
                     padding: 0;
-                    border-radius: 50%;
-                    justify-content: center;
-                    --mdc-icon-size: 18px;
+                    text-align: left;
+                    cursor: pointer;
+                }
+
+                button:focus-visible,
+                .row:focus-visible {
+                    outline: 2px solid var(--primary-color);
+                    outline-offset: -2px;
+                }
+
+                .hd {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px 12px 0 16px;
+                }
+
+                .hd-title {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    font-size: var(--ha-card-header-font-size, 18px);
+                    line-height: 1.4;
+                }
+
+                .hd-sub {
+                    flex: none;
+                    padding: 0 16px 2px;
+                    font-size: 12px;
+                }
+
+                .message {
+                    padding: 4px 16px 14px;
+                    font-size: 12px;
+                    color: var(--secondary-text-color);
+                }
+
+                /* The card's one call to action, so it looks like one on any theme. */
+                .action {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 12.5px;
+                    font-weight: 500;
+                    color: var(--text-primary-color, #fff);
+                    background: var(--primary-color);
+                    border-radius: 16px;
+                    padding: 5px 12px;
+                    white-space: nowrap;
+                    --mdc-icon-size: 16px;
                 }
 
                 .action ha-icon {
+                    display: none;
+                }
+
+                .action.ghost {
+                    color: var(--primary-text-color);
+                    background: var(--uc-track);
+                }
+
+                .action.ghost ha-icon {
                     display: inline-flex;
                 }
 
-                .action span {
-                    display: none;
+                .action:disabled {
+                    opacity: 0.5;
+                    cursor: default;
                 }
-            }
 
-            /* A wide group has room for a waiting row's versions beside its name. */
-            @container (min-width: 600px) {
-                .row:not(.sib) .info,
-                .sum .info {
+                .bar {
+                    flex: none;
                     display: flex;
-                    align-items: baseline;
-                    justify-content: space-between;
-                    gap: 16px;
+                    gap: 3px;
+                    margin: 8px 16px 0;
                 }
 
-                .row:not(.sib) .ver,
-                .sum .ver {
-                    text-align: right;
+                .seg {
+                    flex: 1 1 0;
+                    height: 4px;
+                    border-radius: 2px;
+                    background: color-mix(in srgb, var(--secondary-text-color) 35%, transparent);
                 }
-            }
 
-            @media (prefers-reduced-motion: reduce) {
-                .spin {
-                    animation: none;
+                .seg.running {
+                    background: var(--primary-color);
+                    opacity: 0.6;
+                }
+
+                .seg.done {
+                    background: var(--success-color, #43a047);
+                }
+
+                .list {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    overscroll-behavior: contain;
+                    scrollbar-width: thin;
+                }
+
+                .cols {
+                    padding: 6px 0 4px;
                 }
 
                 .fold {
-                    transition: none;
+                    display: grid;
+                    grid-template-rows: 0fr;
+                    min-width: 0;
+                    transition: grid-template-rows var(--ha-animation-duration-normal, 250ms) ease;
                 }
-            }
-        `;
+
+                .fold.open {
+                    grid-template-rows: 1fr;
+                }
+
+                .fold-in {
+                    min-height: 0;
+                    overflow: hidden;
+                }
+
+                /* Side by side when there is room, each group laid out by its own width. */
+                .group {
+                    container-type: inline-size;
+                    min-width: 0;
+                }
+
+                @container (min-width: 700px) {
+                    .cols {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        column-gap: 8px;
+                        align-items: start;
+                    }
+
+                    /* A group with nothing waiting, while shut, leaves its column to those that have something. */
+                    .cols > .fold:not(.open) {
+                        order: 1;
+                    }
+                }
+
+                .grp-h {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 10px 12px 2px 16px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    letter-spacing: 0.02em;
+                    text-transform: uppercase;
+                    color: var(--secondary-text-color);
+                }
+
+                .grp-h .n {
+                    font-weight: 400;
+                }
+
+                .grp-body {
+                    margin-left: 16px;
+                    border-left: 2px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+                }
+
+                .grp-body .row {
+                    padding-left: 12px;
+                }
+
+                .row,
+                .sum {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    padding: 3px 12px 3px 16px;
+                    min-height: 40px;
+                    cursor: pointer;
+                }
+
+                .sum {
+                    min-height: 44px;
+                }
+
+                .chev {
+                    flex: none;
+                    --mdc-icon-size: 20px;
+                    color: var(--secondary-text-color);
+                }
+
+                .info {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    display: block;
+                }
+
+                /* Names and versions wrap rather than being cut. */
+                .name,
+                .ver {
+                    display: block;
+                    line-height: 1.3;
+                    overflow-wrap: anywhere;
+                }
+
+                .name {
+                    font-size: 14px;
+                }
+
+                .ver {
+                    font-family: var(--ha-font-family-code, ui-monospace, monospace);
+                    font-size: 11.5px;
+                    color: var(--secondary-text-color);
+                }
+
+                .ver .new {
+                    color: var(--primary-color);
+                    font-weight: 500;
+                }
+
+                .end {
+                    flex: none;
+                    max-width: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: flex-end;
+                    color: var(--secondary-text-color);
+                }
+
+                .muted {
+                    opacity: 0.62;
+                }
+
+                .count {
+                    font-size: 11px;
+                    color: var(--secondary-text-color);
+                    background: var(--uc-track);
+                    border-radius: 8px;
+                    padding: 0 6px;
+                    margin-left: 6px;
+                    vertical-align: 1px;
+                    white-space: nowrap;
+                }
+
+                .install {
+                    width: 30px;
+                    height: 30px;
+                    border-radius: 50%;
+                    background: color-mix(in srgb, var(--primary-color) 30%, transparent);
+                    color: var(--primary-text-color);
+                    display: grid;
+                    place-items: center;
+                    --mdc-icon-size: 17px;
+                }
+
+                .install:disabled {
+                    opacity: 0.35;
+                    cursor: default;
+                }
+
+                .pill {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 3px;
+                    font-size: 11px;
+                    font-weight: 500;
+                    border-radius: 10px;
+                    padding: 1px 8px;
+                    white-space: nowrap;
+                    --mdc-icon-size: 12px;
+                }
+
+                .pill.running {
+                    background: var(--uc-soft);
+                    color: var(--primary-color);
+                }
+
+                .pill.done {
+                    background: rgba(var(--rgb-success-color, 67, 160, 71), 0.12);
+                    color: var(--success-color, #43a047);
+                }
+
+                .pill.failed {
+                    background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                    color: var(--error-color, #db4437);
+                }
+
+                .pill.off {
+                    background: var(--uc-track);
+                    color: var(--secondary-text-color);
+                }
+
+                .spin {
+                    animation: spin 1.4s linear infinite;
+                }
+
+                @keyframes spin {
+                    to {
+                        transform: rotate(360deg);
+                    }
+                }
+
+                .errline {
+                    margin: 0 12px 6px 12px;
+                    padding: 6px 9px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: var(--error-color, #db4437);
+                    background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                }
+
+                .row.sib {
+                    min-height: 26px;
+                    padding-top: 1px;
+                    padding-bottom: 1px;
+                    flex-wrap: wrap;
+                    row-gap: 0;
+                }
+
+                .row.sib .name {
+                    font-size: 13px;
+                }
+
+                .row.sib .info {
+                    flex: 1 0 auto;
+                    max-width: 100%;
+                }
+
+                .row.sib .end {
+                    margin-left: auto;
+                    max-width: 100%;
+                }
+
+                /* A rule above it, inset as the rows are, keeps it apart from the rows before it. */
+                .off-line {
+                    --uc-inset: 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    margin-top: 6px;
+                    padding: 10px 12px 2px var(--uc-inset);
+                    background: linear-gradient(var(--divider-color, rgba(0, 0, 0, 0.12)), var(--divider-color, rgba(0, 0, 0, 0.12)))
+                        no-repeat left var(--uc-inset) top 0 / calc(100% - var(--uc-inset) - 12px) 1px;
+                    font-size: 12px;
+                    color: var(--secondary-text-color);
+                    opacity: 0.8;
+                    --mdc-icon-size: 16px;
+                }
+
+                .off-state {
+                    font-size: 11.5px;
+                    white-space: nowrap;
+                }
+
+                .grow {
+                    flex: 1 1 auto;
+                }
+
+                .switch {
+                    flex: none;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    border-top: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+                    padding: 9px 16px;
+                    font-size: 12.5px;
+                    color: var(--secondary-text-color);
+                }
+
+                /* The whole card as one line while nothing waits. */
+                .one {
+                    flex: none;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    box-sizing: border-box;
+                    padding: 12px 12px 12px 16px;
+                }
+
+                .one .ok {
+                    flex: none;
+                    color: var(--success-color, #43a047);
+                }
+
+                .one-title {
+                    flex: 1 1 auto;
+                    min-width: 0;
+                    font-size: 16px;
+                    overflow-wrap: anywhere;
+                }
+
+                .one-sum {
+                    font-size: 12.5px;
+                    color: var(--secondary-text-color);
+                    text-align: right;
+                }
+
+                /* A narrow card gives the rows the room its indents would take, and the title the room of the button's text. */
+                @container (max-width: 300px) {
+                    .hd,
+                    .row,
+                    .sum,
+                    .one,
+                    .grp-h {
+                        padding-left: 10px;
+                    }
+
+                    .off-line {
+                        --uc-inset: 10px;
+                    }
+
+                    .hd-sub,
+                    .switch {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                    }
+
+                    .bar {
+                        margin-left: 10px;
+                        margin-right: 10px;
+                    }
+
+                    .grp-body {
+                        margin-left: 10px;
+                    }
+
+                    .grp-body .row {
+                        padding-left: 8px;
+                    }
+
+                    .one {
+                        flex-wrap: wrap;
+                        row-gap: 2px;
+                    }
+
+                    .action {
+                        width: 32px;
+                        height: 32px;
+                        padding: 0;
+                        border-radius: 50%;
+                        justify-content: center;
+                        --mdc-icon-size: 18px;
+                    }
+
+                    .action ha-icon {
+                        display: inline-flex;
+                    }
+
+                    .action span {
+                        display: none;
+                    }
+                }
+
+                /* A wide group has room for a waiting row's versions beside its name. */
+                @container (min-width: 600px) {
+                    .row:not(.sib) .info,
+                    .sum .info {
+                        display: flex;
+                        align-items: baseline;
+                        justify-content: space-between;
+                        gap: 16px;
+                    }
+
+                    .row:not(.sib) .ver,
+                    .sum .ver {
+                        text-align: right;
+                    }
+                }
+
+                @media (prefers-reduced-motion: reduce) {
+                    .spin {
+                        animation: none;
+                    }
+
+                    .fold {
+                        transition: none;
+                    }
+                }
+            `,
+            fadeStyles,
+        ];
     }
 }
 

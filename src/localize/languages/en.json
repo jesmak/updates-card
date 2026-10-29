@@ -4,6 +4,7 @@
         "description": "Update entities in groups, folded to one line when nothing is waiting",
         "title": "Updates",
         "invalid_configuration": "Invalid configuration",
+        "invalid_height": "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
         "no_entities": "No update entities found",
         "all_current_count": "All up to date · {n}",
         "current_unreachable": "Up to date · {n} unreachable",
@@ -46,7 +47,14 @@
         "exclude_helper": "Update entities never shown in this group.",
         "install_action": "Update all",
         "install_action_helper": "What the Update all button does, such as a script that updates one device after another. Without it, there is no such button.",
+        "height_mode": "Height",
+        "height_mode_helper": "A height set in the layout tab of a sections view is used instead.",
+        "height_mode_auto": "Fits the content",
+        "height_mode_fixed": "Fixed",
+        "height_mode_max": "Grows up to a limit",
+        "height": "Fixed height",
+        "height_helper": "The card is always this tall, and the list scrolls inside it.",
         "max_height": "Maximum height",
-        "max_height_helper": "The card grows with its content up to this height, and then the list scrolls. A height set in the layout tab of a sections view is used instead."
+        "max_height_helper": "The card grows with its content up to this height, and then the list scrolls."
     }
 }
