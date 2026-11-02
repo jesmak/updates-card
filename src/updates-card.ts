@@ -1437,8 +1437,8 @@ export class UpdatesCard extends LitElement {
                     text-overflow: ellipsis;
                 }
 
-                /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. */
-                .held .list {
+                /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. A shut one has neither. */
+                .held .list:not(.shut) {
                     margin-right: 4px;
                     margin-bottom: 8px;
                 }
