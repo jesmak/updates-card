@@ -60,20 +60,27 @@ afterEach(() => {
 });
 
 describe("updates-card", () => {
-    it("is one line when nothing waits, and opens to every device by group", async () => {
+    it("says all is up to date under a check when nothing waits, and its line of those up to date opens to every device by group", async () => {
         const element = await card(home({ installed: "2026.2.0" }));
-        expect(text(one(element, ".one"))).toBe("Devices All up to date · 7");
+        expect(text(one(element, ".hd"))).toBe("Devices");
+        expect(one(element, ".hd .hd-icon")?.getAttribute("icon")).toBe("mdi:check-circle-outline");
+        expect(text(one(element, ".hd-sub"))).toBe("All up to date");
+        expect(text(one(element, ".switch.quiet"))).toBe("7 up to date Show");
+        // Out of the list, which is what scrolls when the card is held, so the line stays while the devices scroll.
+        expect(one(element, ".switch.quiet")!.parentElement!.tagName).toBe("HA-CARD");
+        expect(one(element, ".list .switch")).toBeNull();
         expect(one(element, ".cols")).toBeNull();
-        (one(element, ".one") as HTMLButtonElement).click();
+        (one(element, ".switch.quiet") as HTMLButtonElement).click();
         await element.updateComplete;
         expect(all(element, ".grp-h").map(text)).toEqual(["House4", "Shed3"]);
         expect(all(element, ".row.sib .name").map(text)).toEqual([...HOUSE].sort().concat([...SHED].sort()));
     });
 
-    it("folds devices out of reach into the one line, and names them there", async () => {
+    it("counts devices out of reach in its status line, and shows them in their groups", async () => {
         const element = await card(home({ installed: "2026.2.0" }, { state: "unavailable" }));
-        expect(text(one(element, ".one-sum"))).toBe("Up to date · 3 unreachable");
-        (one(element, ".one") as HTMLButtonElement).click();
+        expect(text(one(element, ".hd-sub"))).toBe("Up to date · 3 unreachable");
+        expect(text(one(element, ".switch.quiet .switch-text"))).toBe("4 up to date");
+        (one(element, ".switch.quiet") as HTMLButtonElement).click();
         await element.updateComplete;
         (one(element, ".off-line") as HTMLButtonElement).click();
         await element.updateComplete;
@@ -207,7 +214,7 @@ describe("updates-card", () => {
         expect(["fade-top", "fade-bottom"].filter((name) => list.classList.contains(name))).toEqual(expected);
     });
 
-    it("fades the bottom edge of the groups' lines under a held card's one line, and lets go of them when the list opens", async () => {
+    it("fades the bottom edge of the groups' lines under a held card's line of those up to date, and lets go of them when the list opens", async () => {
         const element = await quiet({ height: 300 });
         const idle = one(element, ".idle") as HTMLElement;
         Object.defineProperty(idle, "scrollHeight", { value: 600, configurable: true });
@@ -215,7 +222,7 @@ describe("updates-card", () => {
         element.requestUpdate();
         await element.updateComplete;
         expect([...idle.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
-        (one(element, ".one") as HTMLElement).click();
+        (one(element, ".switch.quiet") as HTMLElement).click();
         await element.updateComplete;
         expect(one(element, ".idle")).toBeNull();
         expect([...idle.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
@@ -228,8 +235,10 @@ describe("updates-card", () => {
             (target.getBoundingClientRect = () => ({ top: 0, bottom: height, height, width }) as DOMRect);
         Object.defineProperty(haCard, "clientWidth", { value: 300, configurable: true });
         box(haCard, 56);
-        const line = one(element, ".one") as HTMLElement;
-        box(line, 48);
+        box(one(element, ".hd")!, 41);
+        box(one(element, ".hd-sub")!, 17);
+        const line = one(element, ".switch.quiet") as HTMLElement;
+        box(line, 44);
         const fill = async () => {
             (element as unknown as { fillRows(): void }).fillRows();
             await element.updateComplete;
@@ -280,7 +289,7 @@ describe("updates-card", () => {
         element.requestUpdate();
         await element.updateComplete;
         if (open) {
-            (one(element, ".one") as HTMLElement).click();
+            (one(element, ".switch.quiet") as HTMLElement).click();
             await element.updateComplete;
         }
         return element;
@@ -303,7 +312,7 @@ describe("updates-card", () => {
         const element = await quiet(extra as Partial<UpdatesCardConfig>, layout, [], open);
         expect(one(element, ".idle") !== null).toBe(idle);
         expect(one(element, ".idle-icon") !== null).toBe(idle);
-        expect(one(element, ".one")!.getAttribute("aria-expanded")).toBe(open ? "true" : "false");
+        expect(one(element, ".switch.quiet")!.getAttribute("aria-expanded")).toBe(open ? "true" : "false");
         expect(all(element, ".list .row").length > 0).toBe(open);
     });
 
@@ -402,7 +411,7 @@ describe("updates-card", () => {
 
     it("gives every text a held card may cut short its own text as a tooltip", async () => {
         const quietCard = await quiet({ height: 300 });
-        for (const selector of [".one-title", ".one-sum"]) {
+        for (const selector of [".hd-title", ".hd-sub", ".switch-text"]) {
             const element = one(quietCard, selector)!;
             expect(element.getAttribute("title")).toBe(text(element));
         }
@@ -465,7 +474,7 @@ describe("updates-card following an update-all script", () => {
         const hass = home({ installed: "2026.2.0" });
         hass.states["script.update_devices"] = { entity_id: "script.update_devices", state: "on", last_changed: "", attributes: {} };
         const element = await card(hass);
-        expect(text(one(element, ".one-sum"))).toBe("All up to date · 7");
+        expect(text(one(element, ".hd-sub"))).toBe("All up to date");
 
         const waiting = home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" });
         waiting.states["script.update_devices"] = hass.states["script.update_devices"];
@@ -618,10 +627,10 @@ describe("updates-card's own elements", () => {
             then: (_e: UpdatesCard, row: Element) => expect(text(row.querySelector(".name"))).toBe("Hall light"),
         },
         {
-            name: "a row out of reach in the one-line card, when a row before it goes away",
+            name: "a row out of reach while nothing waits, when a row before it goes away",
             before: home(CURRENT, CURRENT, { 1: AWAY }),
             open: async (e: UpdatesCard) => {
-                await click(e, one(e, ".one")!);
+                await click(e, one(e, ".switch.quiet")!);
                 await click(e, named(e, ".off-line", ""));
             },
             after: home(CURRENT, CURRENT, { 1: AWAY, 2: AWAY }),
@@ -629,9 +638,9 @@ describe("updates-card's own elements", () => {
             then: (_e: UpdatesCard, row: Element) => expect(text(row.querySelector(".name"))).toBe("Hall light"),
         },
         {
-            name: "a row of the one-line card, when a row before it goes away",
+            name: "a row up to date while nothing waits, when a row before it goes away",
             before: home(CURRENT),
-            open: (e: UpdatesCard) => click(e, one(e, ".one")!),
+            open: (e: UpdatesCard) => click(e, one(e, ".switch.quiet")!),
             after: home(CURRENT, CURRENT, { 2: AWAY }),
             pick: (e: UpdatesCard) => named(e, ".row.sib", "Hall light"),
             then: (_e: UpdatesCard, row: Element) => expect(text(row.querySelector(".name"))).toBe("Hall light"),

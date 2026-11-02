@@ -1,6 +1,6 @@
 # Updates card
 
-Home Assistant dashboard card for update entities, in groups, folded to a single line when nothing is waiting.
+Home Assistant dashboard card for update entities, in groups, folded away under one line when nothing is waiting.
 
 [![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
 
@@ -17,7 +17,7 @@ A card for Home Assistant's `update` entities, such as the firmware of ESPHome, 
 Home Assistant itself, or anything else that has an update entity. It shows them in groups you choose, by integration, by area or
 by a list of entities.
 
-Most of the time everything is up to date, and the card is a single line that says so. When updates come in, each
+Most of the time everything is up to date, and the card says so under a check, with a line that opens to the devices. When updates come in, each
 group shows only what is waiting. When many devices wait for the same release, as every ESPHome device does when
 ESPHome releases, they fold into one row that opens to them all.
 
@@ -71,10 +71,11 @@ Update entities hidden in Home Assistant are left out, except when listed in `en
 
 ## What it shows
 
-<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/folded-light.png#gh-light-mode-only" width="460" alt="The card as one line, with a check, the title and all ten devices up to date">
-<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/folded-dark.png#gh-dark-mode-only" width="460" alt="The card as one line, with a check, the title and all ten devices up to date">
+<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/folded-light.png#gh-light-mode-only" width="460" alt="With nothing waiting, a check before the title, All up to date under it, and a line counting the ten devices up to date with Show">
+<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/folded-dark.png#gh-dark-mode-only" width="460" alt="With nothing waiting, a check before the title, All up to date under it, and a line counting the ten devices up to date with Show">
 
-**Nothing waiting.** The card is one line. Tapping it opens every update entity, muted, by group, with its version.
+**Nothing waiting.** A check before the title, the status line, and a line counting the devices up to date. Tapping
+its **Show** opens every update entity, muted, by group, with its version.
 
 **Updates waiting.** Each group shows the rows with an update, with the version installed and the one available. A
 line at the bottom opens the rest. Three or more rows of a group that update the same software to the same version
@@ -99,7 +100,7 @@ count covers every waiting row the card can install, so a script that leaves som
 
 **Unreachable devices.** An update entity counts as unreachable when it is unavailable, or when each of its device's
 other entities is unavailable or is a connection sensor that is off. Such rows go on a line of their own at the end of
-their group, and don't keep the card from folding into one line. ESPHome, for one, keeps a sleeping device's update
+their group, and don't count as waiting. The status line counts them instead. ESPHome, for one, keeps a sleeping device's update
 entity available, and its status sensor too, which turns off. That is why the device's other entities are asked, and
 why a connection sensor counts by what it says.
 
@@ -117,12 +118,12 @@ keep to one line each, cut short with an ellipsis when they are longer, with the
 gets lower than these and one group's first row need, which is four rows in a sections view. Longer names and versions scroll the rest of the first row
 with the list. While an **Update all** script runs, its progress bar takes its room from the list.
 
-With nothing waiting, a card held to a set height, fixed or in rows, shows a check under its one line, with a line for
-each named group with devices saying how many of them are up to date and how many are unreachable. The groups without a
+With nothing waiting, a card held to a set height, fixed or in rows, shows a check under the line of those up to date,
+with a line for each named group with devices saying how many of them are up to date and how many are unreachable. The groups without a
 name share a line when a named group has one too. When there are more lines than fit, they scroll.
 
 On automatic rows in a sections view the card takes whole rows, so the cards under it stay on the rows, or with
-`row_step: half` half rows. The room left over goes under the header, or while the card is one line, into that line.
+`row_step: half` half rows. The room left over goes under the status line.
 
 ## Examples
 

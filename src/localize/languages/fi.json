@@ -7,7 +7,7 @@
         "invalid_height": "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikseleinä, ja korkeustilan (height_mode) auto, fixed tai max.",
         "invalid_row_step": "Virheellinen pyöristys. Pyöristyksen (row_step) on oltava full tai half.",
         "no_entities": "Päivitysentiteettejä ei löytynyt",
-        "all_current_count": "Kaikki ajan tasalla · {n}",
+        "all_current": "Kaikki ajan tasalla",
         "current_unreachable": "Ajan tasalla · {n} ei tavoitettavissa",
         "pending_count": "{n} odottaa päivitystä",
         "all_updated": "Kaikki päivitetty",

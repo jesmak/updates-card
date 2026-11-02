@@ -7,7 +7,7 @@
         "invalid_height": "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
         "invalid_row_step": "Invalid rounding. row_step must be full or half.",
         "no_entities": "No update entities found",
-        "all_current_count": "All up to date · {n}",
+        "all_current": "All up to date",
         "current_unreachable": "Up to date · {n} unreachable",
         "pending_count": "{n} waiting for an update",
         "all_updated": "All updated",

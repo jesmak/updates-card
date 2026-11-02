@@ -198,7 +198,8 @@ describe("a row's own install", () => {
         await wait(element, DONE_KEEP - 10_000);
         expect(rowEnd(element, "Alpha")).toBe("Updated");
         await wait(element, 20_000);
-        expect(text(one(element, ".one-sum"))).toBe("All up to date · 3");
+        expect(text(one(element, ".hd-sub"))).toBe("All up to date");
+        expect(text(one(element, ".switch.quiet .switch-text"))).toBe("3 up to date");
     });
 });
 

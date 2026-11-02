@@ -891,7 +891,7 @@ var en_default = {
     invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
     invalid_row_step: "Invalid rounding. row_step must be full or half.",
     no_entities: "No update entities found",
-    all_current_count: "All up to date \xB7 {n}",
+    all_current: "All up to date",
     current_unreachable: "Up to date \xB7 {n} unreachable",
     pending_count: "{n} waiting for an update",
     all_updated: "All updated",
@@ -958,7 +958,7 @@ var fi_default = {
     invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
     invalid_row_step: "Virheellinen py\xF6ristys. Py\xF6ristyksen (row_step) on oltava full tai half.",
     no_entities: "P\xE4ivitysentiteettej\xE4 ei l\xF6ytynyt",
-    all_current_count: "Kaikki ajan tasalla \xB7 {n}",
+    all_current: "Kaikki ajan tasalla",
     current_unreachable: "Ajan tasalla \xB7 {n} ei tavoitettavissa",
     pending_count: "{n} odottaa p\xE4ivityst\xE4",
     all_updated: "Kaikki p\xE4ivitetty",
@@ -1335,7 +1335,8 @@ function narrowestWidth(columns) {
   return columns >= 12 ? 288 : columns >= 9 ? 214 : 140;
 }
 var px = (value) => parseFloat(value) || 0;
-var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".one", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
+var QUIET_GAP_PX = 6;
+var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
 function endHeight(element) {
   if (element.classList.contains("fold")) {
     const inner = element.firstElementChild;
@@ -1368,7 +1369,6 @@ function childChange(element) {
   }
   return change;
 }
-var ONE_PADDING_PX = 12;
 function startOf(row) {
   return { from: row.installed, to: row.latest, software: row.software, softwareKey: row.softwareKey };
 }
@@ -1479,9 +1479,8 @@ var UpdatesCard = class extends i4 {
   }
   /**
    * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
-   * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the header, or while
-   * the card is one shut line, into that line. Measured to where the folds' slides end rather than where they are, so
-   * the card is on its rows as a slide begins.
+   * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the status line.
+   * Measured to where the folds' slides end rather than where they are, so the card is on its rows as a slide begins.
    */
   fillRows() {
     const card = this.renderRoot.querySelector("ha-card");
@@ -1517,22 +1516,20 @@ var UpdatesCard = class extends i4 {
   }
   /** The spare room as drawn now, which while a fold slides is somewhere between the old and the new. */
   spareShown(card) {
-    const one = card.querySelector(":scope > .one");
+    const quiet = card.querySelector(":scope > .switch.quiet");
+    if (quiet) {
+      return Math.max(0, (parseFloat(getComputedStyle(quiet).marginTop) || 0) - QUIET_GAP_PX);
+    }
     const below = card.querySelector(":scope > .list, :scope > .message");
-    const style = one ? getComputedStyle(one) : void 0;
-    const inLine = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) - 2 * ONE_PADDING_PX : 0;
-    return Math.max(0, inLine) + Math.max(0, below ? parseFloat(getComputedStyle(below).marginTop) || 0 : 0);
+    return Math.max(0, below ? parseFloat(getComputedStyle(below).marginTop) || 0 : 0);
   }
-  /**
-   * The card's inline style: the height it is held to, or the rows it fills, with their spare room under the header or,
-   * `inLine`, in the one line the card is while shut.
-   */
-  cardStyle(inLine = false) {
+  /** The card's inline style: the height it is held to, or the rows it fills, with their spare room under the status line. */
+  cardStyle() {
     const held = this.heightStyle();
     if (held || !this.filled) {
       return held;
     }
-    return `min-height: ${this.filled}px; --uc-spare: ${inLine ? 0 : this.spare}px; --uc-line-spare: ${inLine ? this.spare : 0}px`;
+    return `min-height: ${this.filled}px; --uc-spare: ${this.spare}px`;
   }
   /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
   cardClass() {
@@ -1702,20 +1699,28 @@ var UpdatesCard = class extends i4 {
             </ha-card>
         `;
   }
-  /** The whole card as one line, opening to the rows up to date and those out of reach, by group. */
+  /**
+   * While nothing waits, as in wud-queue-card: the header with a check, the status line, and the line of those up to date,
+   * which opens to the rows up to date and those out of reach, by group.
+   */
   folded(title, current, unreachable) {
-    const summary = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current_count", { n: current });
-    return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle(!this.open)} @transitionend=${this.slid}>
-            <button class="one" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
-                <ha-icon class="ok" icon="mdi:check-circle-outline"></ha-icon>
-                <span class="one-title" title=${title}>${title}</span>
-                <span class="one-sum" title=${summary}>${summary}</span>
-                <ha-icon class="chev" icon=${this.open ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
+    const status = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current");
+    const count = current > 0 ? this.text("common.current_count", { n: current }) : this.text("common.unreachable_count", { n: unreachable });
+    const idle = this.setHeight() && !this.open;
+    return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
+            <div class="hd">
+                <ha-icon class="hd-icon" icon="mdi:check-circle-outline"></ha-icon>
+                <div class="hd-title" title=${title}>${title}</div>
+            </div>
+            <div class="hd-sub" title=${status}>${status}</div>
+            <button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
+                <span class="switch-text" title=${count}>${count}</span>
+                <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
             </button>
-            <div class="list ${this.open ? "" : "shut"}">
+            <div class="list ${idle ? "shut" : ""}">
                 ${this.fold(this.open, b2`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
             </div>
-            ${this.setHeight() && !this.open ? this.idle() : A}
+            ${idle ? this.idle() : A}
         </ha-card>`;
   }
   /**
@@ -2071,6 +2076,12 @@ var UpdatesCard = class extends i4 {
                     padding: 12px 12px 0 16px;
                 }
 
+                /* A check before the title while nothing waits, as in wud-queue-card. */
+                .hd-icon {
+                    flex: none;
+                    color: var(--success-color, #43a047);
+                }
+
                 .hd-title {
                     flex: 1 1 auto;
                     min-width: 0;
@@ -2082,6 +2093,11 @@ var UpdatesCard = class extends i4 {
                     flex: none;
                     padding: 0 16px 2px;
                     font-size: 12px;
+                }
+
+                /* Under the check, the status line starts where the title does: the header's padding, the icon and the gap. */
+                .hd:has(.hd-icon) + .hd-sub {
+                    padding-left: 50px;
                 }
 
                 .message {
@@ -2430,34 +2446,17 @@ var UpdatesCard = class extends i4 {
                     color: var(--secondary-text-color);
                 }
 
-                /* The whole card as one line while nothing waits. */
-                .one {
+                /*
+                 * While nothing waits, the line of those up to date stays above the list, out of what scrolls, with room
+                 * above it as the groups have while updates wait, and what a whole row leaves over on top of that.
+                 */
+                .switch.quiet {
                     flex: none;
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    width: 100%;
-                    box-sizing: border-box;
-                    padding: calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 12px
-                        calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 16px;
+                    margin-top: calc(var(--uc-spare, 0px) + ${QUIET_GAP_PX}px);
                 }
 
-                .one .ok {
-                    flex: none;
-                    color: var(--success-color, #43a047);
-                }
-
-                .one-title {
-                    flex: 1 1 auto;
-                    min-width: 0;
-                    font-size: 16px;
-                    overflow-wrap: anywhere;
-                }
-
-                .one-sum {
-                    font-size: 12.5px;
-                    color: var(--secondary-text-color);
-                    text-align: right;
+                .switch.quiet + .list {
+                    margin-top: 0;
                 }
 
                 /* A narrow card gives the rows the room its indents would take, and the title the room of the button's text. */
@@ -2465,7 +2464,6 @@ var UpdatesCard = class extends i4 {
                     .hd,
                     .row,
                     .sum,
-                    .one,
                     .grp-h {
                         padding-left: 10px;
                     }
@@ -2480,6 +2478,10 @@ var UpdatesCard = class extends i4 {
                         padding-right: 10px;
                     }
 
+                    .hd:has(.hd-icon) + .hd-sub {
+                        padding-left: 44px;
+                    }
+
                     .bar {
                         margin-left: 10px;
                         margin-right: 10px;
@@ -2491,11 +2493,6 @@ var UpdatesCard = class extends i4 {
 
                     .grp-body .row {
                         padding-left: 8px;
-                    }
-
-                    .one {
-                        flex-wrap: wrap;
-                        row-gap: 2px;
                     }
 
                     .action {
@@ -2536,8 +2533,6 @@ var UpdatesCard = class extends i4 {
                 .held .hd-title,
                 .held .hd-sub,
                 .held .grp-name,
-                .held .one-title,
-                .held .one-sum,
                 .held .switch-text {
                     min-width: 0;
                     white-space: nowrap;
@@ -2553,10 +2548,6 @@ var UpdatesCard = class extends i4 {
 
                 .held .cols {
                     padding-bottom: 0;
-                }
-
-                .held .one {
-                    flex-wrap: nowrap;
                 }
 
                 /* Held and shut, the room under the line goes to the check and the groups' lines instead of the list. */
@@ -2596,9 +2587,10 @@ var UpdatesCard = class extends i4 {
                     max-width: 100%;
                 }
 
+                /* A line wraps rather than cut short, its icon by its first line, as the room scrolls when they don't fit. */
                 .idle-line {
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     gap: 6px;
                     max-width: 100%;
                     font-size: 12px;
@@ -2612,13 +2604,7 @@ var UpdatesCard = class extends i4 {
 
                 .idle-line span {
                     min-width: 0;
-                    white-space: nowrap;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                }
-
-                .held .one-sum {
-                    flex: 0 1 auto;
+                    overflow-wrap: anywhere;
                 }
 
                 .grp-name {
@@ -2630,8 +2616,7 @@ var UpdatesCard = class extends i4 {
                     transition: min-height var(--ha-animation-duration-normal, 250ms) ease;
                 }
 
-                ha-card.sliding > .list,
-                ha-card.sliding > .one {
+                ha-card.sliding > .list {
                     transition:
                         margin var(--ha-animation-duration-normal, 250ms) ease,
                         padding var(--ha-animation-duration-normal, 250ms) ease;
@@ -2644,8 +2629,7 @@ var UpdatesCard = class extends i4 {
 
                     .fold,
                     ha-card.sliding,
-                    ha-card.sliding > .list,
-                    ha-card.sliding > .one {
+                    ha-card.sliding > .list {
                         transition: none;
                     }
                 }
