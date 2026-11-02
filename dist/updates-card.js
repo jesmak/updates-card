@@ -889,6 +889,7 @@ var en_default = {
     title: "Updates",
     invalid_configuration: "Invalid configuration",
     invalid_height: "Invalid height. height and max_height must be positive numbers of pixels, and height_mode auto, fixed or max.",
+    invalid_row_step: "Invalid rounding. row_step must be full or half.",
     no_entities: "No update entities found",
     all_current_count: "All up to date \xB7 {n}",
     current_unreachable: "Up to date \xB7 {n} unreachable",
@@ -939,7 +940,11 @@ var en_default = {
     height: "Fixed height",
     height_helper: "The card is always this tall, and the list scrolls inside it.",
     max_height: "Maximum height",
-    max_height_helper: "The card grows with its content up to this height, and then the list scrolls."
+    max_height_helper: "The card grows with its content up to this height, and then the list scrolls.",
+    row_step: "Rounding in a sections view",
+    row_step_helper: "With automatic row height, the card's height is rounded up to whole rows, or to half rows to save space.",
+    row_step_full: "Whole rows",
+    row_step_half: "Half rows"
   }
 };
 
@@ -951,6 +956,7 @@ var fi_default = {
     title: "P\xE4ivitykset",
     invalid_configuration: "Virheelliset asetukset",
     invalid_height: "Virheellinen korkeus. Korkeuksien (height ja max_height) on oltava positiivisia lukuja pikselein\xE4, ja korkeustilan (height_mode) auto, fixed tai max.",
+    invalid_row_step: "Virheellinen py\xF6ristys. Py\xF6ristyksen (row_step) on oltava full tai half.",
     no_entities: "P\xE4ivitysentiteettej\xE4 ei l\xF6ytynyt",
     all_current_count: "Kaikki ajan tasalla \xB7 {n}",
     current_unreachable: "Ajan tasalla \xB7 {n} ei tavoitettavissa",
@@ -1001,7 +1007,11 @@ var fi_default = {
     height: "Kiinte\xE4 korkeus",
     height_helper: "Kortti on aina n\xE4in korkea, ja lista vierii sen sis\xE4ll\xE4.",
     max_height: "Enimm\xE4iskorkeus",
-    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen lista vierii."
+    max_height_helper: "Kortti kasvaa sis\xE4lt\xF6ns\xE4 mukana t\xE4h\xE4n korkeuteen asti, ja sen j\xE4lkeen lista vierii.",
+    row_step: "Py\xF6ristys osioihin jaetussa n\xE4kym\xE4ss\xE4",
+    row_step_helper: "Automaattisella rivikorkeudella kortin korkeus py\xF6ristet\xE4\xE4n yl\xF6sp\xE4in kokonaisiin riveihin, tai tilan s\xE4\xE4st\xE4miseksi puolikkaisiin riveihin.",
+    row_step_full: "Kokonaisiin riveihin",
+    row_step_half: "Puolikkaisiin riveihin"
   }
 };
 
@@ -1027,6 +1037,41 @@ function read(table, key) {
 }
 function browserLanguage() {
   return document.documentElement.lang || navigator.language || "en";
+}
+
+// src/rows.ts
+var ROW_STEPS = ["full", "half"];
+var ROW_PX = 64;
+var ROW_GAP_PX = 8;
+function validRowStep(config) {
+  return config.row_step === void 0 || config.row_step === null || ROW_STEPS.includes(config.row_step);
+}
+function filledHeight(content, config) {
+  const step = config.row_step === "half" ? ROW_PX / 2 : ROW_PX;
+  return Math.max(1, Math.ceil((content + ROW_GAP_PX) / step)) * step - ROW_GAP_PX;
+}
+function rowStepSchema(config, text) {
+  if (heightMode(config) !== "auto") {
+    return [];
+  }
+  return [
+    {
+      name: "row_step",
+      selector: {
+        select: { mode: "dropdown", options: ROW_STEPS.map((value) => ({ value, label: text(`editor.row_step_${value}`) })) }
+      }
+    }
+  ];
+}
+function rowStepData(config) {
+  return { ...config, row_step: config.row_step ?? "full" };
+}
+function tidyRowStep(config) {
+  const tidied = { ...config };
+  if (tidied.row_step !== "half" || heightMode(tidied) !== "auto") {
+    delete tidied.row_step;
+  }
+  return tidied;
 }
 
 // src/updates.ts
@@ -1202,7 +1247,8 @@ function schema(hass, config, text) {
       }
     },
     { name: "install_action", selector: { ui_action: { actions: ["perform-action", "navigate", "url"] } } },
-    ...heightSchema(config, text)
+    ...heightSchema(config, text),
+    ...rowStepSchema(config, text)
   ];
 }
 var UpdatesCardEditor = class extends i4 {
@@ -1220,7 +1266,7 @@ var UpdatesCardEditor = class extends i4 {
     return b2`
             <ha-form
                 .hass=${this.hass}
-                .data=${heightData(this.config)}
+                .data=${rowStepData(heightData(this.config))}
                 .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry) => this.helper(entry.name)}
@@ -1229,7 +1275,7 @@ var UpdatesCardEditor = class extends i4 {
         `;
   }
   valueChanged(event) {
-    const config = tidyHeight(event.detail.value);
+    const config = tidyRowStep(tidyHeight(event.detail.value));
     const empty = (value) => value === void 0 || value === null || String(value) === "" || Array.isArray(value) && value.length === 0;
     if (config.groups) {
       config.groups = config.groups.map((group) => Object.fromEntries(Object.entries(group).filter(([, value]) => !empty(value))));
@@ -1279,6 +1325,50 @@ registry.customCards.push({
   documentationURL: "https://github.com/jesmak/updates-card",
   preview: true
 });
+var HELD_FRAME_PX = 44 + 19 + 6 + 29 + 37 + 2;
+var FIRST_ROW_PX = [
+  [288, 44],
+  [214, 58],
+  [0, 73]
+];
+function narrowestWidth(columns) {
+  return columns >= 12 ? 288 : columns >= 9 ? 214 : 140;
+}
+var px = (value) => parseFloat(value) || 0;
+var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".one", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
+function endHeight(element) {
+  if (element.classList.contains("fold")) {
+    const inner = element.firstElementChild;
+    const last = inner?.lastElementChild;
+    if (!element.classList.contains("open") || !inner || !last) {
+      return 0;
+    }
+    const natural = last.getBoundingClientRect().bottom + px(getComputedStyle(last).marginBottom) - inner.getBoundingClientRect().top;
+    return natural + childChange(inner);
+  }
+  if (!element.querySelector(".fold")) {
+    return element.getBoundingClientRect().height;
+  }
+  const style = getComputedStyle(element);
+  if (style.display !== "grid") {
+    return element.getBoundingClientRect().height + childChange(element);
+  }
+  const columns = style.gridTemplateColumns.split(" ").length;
+  const placed = [...element.children].map((child, index) => ({ child, index, order: parseInt(getComputedStyle(child).order) || 0 })).sort((a3, b3) => a3.order - b3.order || a3.index - b3.index).map(({ child }) => child);
+  let height = px(style.paddingTop) + px(style.paddingBottom);
+  for (let start = 0; start < placed.length; start += columns) {
+    height += Math.max(...placed.slice(start, start + columns).map((child) => endHeight(child)));
+  }
+  return height;
+}
+function childChange(element) {
+  let change = 0;
+  for (const child of element.children) {
+    change += endHeight(child) - child.getBoundingClientRect().height;
+  }
+  return change;
+}
+var ONE_PADDING_PX = 12;
 function startOf(row) {
   return { from: row.installed, to: row.latest, software: row.software, softwareKey: row.softwareKey };
 }
@@ -1295,6 +1385,11 @@ var UpdatesCard = class extends i4 {
     this.opened = /* @__PURE__ */ new Set();
     this.installs = /* @__PURE__ */ new Map();
     this.now = Date.now();
+    this.filled = 0;
+    this.spare = 0;
+    this.sliding = false;
+    this.width = 0;
+    this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
     /** Whether the install-all script was running at the last update, whether its run has taken on its rows, and when it last stopped. */
     this.running = false;
     this.tookOn = false;
@@ -1302,7 +1397,18 @@ var UpdatesCard = class extends i4 {
     /** The entities whose changes matter: the rows, their devices' other entities and the script. */
     this.watched = [];
     this.siblings = /* @__PURE__ */ new Map();
-    new ScrollFade(this, () => this.heightStyle() ? this.renderRoot.querySelectorAll(".list") : []);
+    this.toggleAll = () => {
+      this.open = !this.open;
+      this.slide();
+    };
+    this.slid = (event) => {
+      const target = event.target;
+      if (event.propertyName === "grid-template-rows" && target.classList?.contains("fold")) {
+        window.clearTimeout(this.slideTimer);
+        this.sliding = false;
+      }
+    };
+    new ScrollFade(this, () => this.heightStyle() ? this.renderRoot.querySelectorAll(".list, .idle") : []);
   }
   static getConfigElement() {
     return document.createElement("updates-card-editor");
@@ -1317,6 +1423,9 @@ var UpdatesCard = class extends i4 {
     if (!validHeight(config)) {
       throw new Error(translate(browserLanguage(), "common.invalid_height"));
     }
+    if (!validRowStep(config)) {
+      throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
+    }
     this.config = { ...config };
   }
   getCardSize() {
@@ -1326,9 +1435,20 @@ var UpdatesCard = class extends i4 {
   getGridOptions() {
     return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
   }
-  /** Held to a height, the header, the status line, one group's first row and the line of those up to date still fit. */
+  /**
+   * Held to a height, the header, the status line, a group's header, its first row and the line of those up to date still
+   * fit, at the narrowest the card's columns allow or at its measured width if narrower. The texts above the list keep
+   * to one line then. The progress bar of an update-all run takes its room from the list while the run goes on.
+   */
   minimumHeight() {
-    return 170;
+    const narrowest = Math.min(narrowestWidth(this.gridColumns()), this.width || Infinity);
+    return HELD_FRAME_PX + FIRST_ROW_PX.find(([width]) => narrowest >= width)[1];
+  }
+  /** The columns set in the layout tab, in either form Home Assistant has saved them, or a whole section. */
+  gridColumns() {
+    const config = this.config;
+    const columns = config?.grid_options ? config.grid_options.columns : typeof config?.layout_options?.grid_columns === "number" ? config.layout_options.grid_columns * 3 : void 0;
+    return typeof columns === "number" ? columns : 12;
   }
   connectedCallback() {
     super.connectedCallback();
@@ -1338,6 +1458,91 @@ var UpdatesCard = class extends i4 {
     super.disconnectedCallback();
     window.clearInterval(this.timer);
     this.timer = void 0;
+    this.resizes?.disconnect();
+    cancelAnimationFrame(this.frame ?? 0);
+    window.clearTimeout(this.slideTimer);
+    this.sliding = false;
+  }
+  updated() {
+    if (!this.isConnected) {
+      return;
+    }
+    const card = this.renderRoot.querySelector("ha-card");
+    if (card) {
+      this.resizes?.observe(card);
+    }
+    this.measureSoon();
+  }
+  measureSoon() {
+    cancelAnimationFrame(this.frame ?? 0);
+    this.frame = requestAnimationFrame(() => this.fillRows());
+  }
+  /**
+   * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
+   * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the header, or while
+   * the card is one shut line, into that line. Measured to where the folds' slides end rather than where they are, so
+   * the card is on its rows as a slide begins.
+   */
+  fillRows() {
+    const card = this.renderRoot.querySelector("ha-card");
+    if (!card || !card.clientWidth) {
+      return;
+    }
+    const width = Math.round(card.getBoundingClientRect().width);
+    if (width !== this.width) {
+      this.width = width;
+    }
+    if (this.layout !== "grid" || this.heightStyle()) {
+      if (this.filled) this.filled = 0;
+      if (this.spare) this.spare = 0;
+      return;
+    }
+    const style = getComputedStyle(card);
+    let content = px(style.borderTopWidth) + px(style.borderBottomWidth) + px(style.paddingTop) + px(style.paddingBottom);
+    for (const part of card.querySelectorAll(CARD_PARTS)) {
+      const partStyle = getComputedStyle(part);
+      const inner = part.classList.contains("list") ? part.firstElementChild : null;
+      const height = part.classList.contains("list") ? inner ? endHeight(inner) : 0 : part.getBoundingClientRect().height;
+      content += px(partStyle.marginTop) + height + px(partStyle.marginBottom);
+    }
+    content -= this.spareShown(card);
+    const filled = filledHeight(Math.round(content), this.config ?? {});
+    const spare = Math.max(0, Math.floor(filled - content));
+    if (filled !== this.filled) {
+      this.filled = filled;
+    }
+    if (spare !== this.spare) {
+      this.spare = spare;
+    }
+  }
+  /** The spare room as drawn now, which while a fold slides is somewhere between the old and the new. */
+  spareShown(card) {
+    const one = card.querySelector(":scope > .one");
+    const below = card.querySelector(":scope > .list, :scope > .message");
+    const style = one ? getComputedStyle(one) : void 0;
+    const inLine = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) - 2 * ONE_PADDING_PX : 0;
+    return Math.max(0, inLine) + Math.max(0, below ? parseFloat(getComputedStyle(below).marginTop) || 0 : 0);
+  }
+  /**
+   * The card's inline style: the height it is held to, or the rows it fills, with their spare room under the header or,
+   * `inLine`, in the one line the card is while shut.
+   */
+  cardStyle(inLine = false) {
+    const held = this.heightStyle();
+    if (held || !this.filled) {
+      return held;
+    }
+    return `min-height: ${this.filled}px; --uc-spare: ${inLine ? 0 : this.spare}px; --uc-line-spare: ${inLine ? this.spare : 0}px`;
+  }
+  /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
+  cardClass() {
+    return [this.heightStyle() && "held", this.sliding && "sliding"].filter(Boolean).join(" ");
+  }
+  /** A fold set sliding: the card fills its rows along with the slide until the slide's end, or a second in case none comes. */
+  slide() {
+    this.sliding = true;
+    window.clearTimeout(this.slideTimer);
+    this.slideTimer = window.setTimeout(() => this.sliding = false, 1e3);
   }
   shouldUpdate(changed) {
     if (!this.config || !changed.has("hass") || changed.size > 1) {
@@ -1443,8 +1648,8 @@ var UpdatesCard = class extends i4 {
     const title = this.config.title ?? this.text("common.title");
     const all = new Map(this.groupList.flatMap((g2) => g2.rows.map((r6) => [r6.entity_id, r6])));
     if (all.size === 0) {
-      return b2`<ha-card style=${this.heightStyle()}>
-                <div class="hd"><div class="hd-title">${title}</div></div>
+      return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()}>
+                <div class="hd"><div class="hd-title" title=${title}>${title}</div></div>
                 <div class="message">${this.text("common.no_entities")}</div>
             </ha-card>`;
     }
@@ -1477,23 +1682,21 @@ var UpdatesCard = class extends i4 {
                 <ha-icon icon="mdi:update"></ha-icon><span>${label}</span>
             </button>`;
     }
+    const status = this.statusLine(active, runs);
+    const currentText = this.text("common.current_count", { n: current.length });
     return b2`
-            <ha-card style=${this.heightStyle()}>
+            <ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
                 <div class="hd">
-                    <div class="hd-title">${title}</div>
+                    <div class="hd-title" title=${title}>${title}</div>
                     ${action}
                 </div>
-                <div class="hd-sub">${this.statusLine(active, runs)}</div>
+                <div class="hd-sub" title=${status}>${status}</div>
                 ${this.running && runs.length > 0 ? this.progress(runs) : A}
                 <div class="list">
                     <div class="cols">${this.groupList.map((group) => this.waitingGroup(group, shown, busy))}</div>
                 </div>
-                ${current.length > 0 ? b2`<button
-                              class="switch"
-                              aria-expanded=${this.open ? "true" : "false"}
-                              @click=${() => this.open = !this.open}
-                          >
-                              <span>${this.text("common.current_count", { n: current.length })}</span>
+                ${current.length > 0 ? b2`<button class="switch" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
+                              <span class="switch-text" title=${currentText}>${currentText}</span>
                               <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
                           </button>` : A}
             </ha-card>
@@ -1502,17 +1705,57 @@ var UpdatesCard = class extends i4 {
   /** The whole card as one line, opening to the rows up to date and those out of reach, by group. */
   folded(title, current, unreachable) {
     const summary = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current_count", { n: current });
-    return b2`<ha-card style=${this.heightStyle()}>
-            <button class="one" aria-expanded=${this.open ? "true" : "false"} @click=${() => this.open = !this.open}>
+    return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle(!this.open)} @transitionend=${this.slid}>
+            <button class="one" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
                 <ha-icon class="ok" icon="mdi:check-circle-outline"></ha-icon>
-                <span class="one-title">${title}</span>
-                <span class="one-sum">${summary}</span>
+                <span class="one-title" title=${title}>${title}</span>
+                <span class="one-sum" title=${summary}>${summary}</span>
                 <ha-icon class="chev" icon=${this.open ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
             </button>
-            <div class="list">
+            <div class="list ${this.open ? "" : "shut"}">
                 ${this.fold(this.open, b2`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
             </div>
+            ${this.setHeight() && !this.open ? this.idle() : A}
         </ha-card>`;
+  }
+  /**
+   * The room a card held to a set height has under its one shut line: a check, and a line for each named group with
+   * devices, with how many are up to date and how many out of reach. The groups without a name share a line when a named
+   * group has one too. More lines than fit scroll.
+   */
+  idle() {
+    const groups = this.groupList.filter((group) => group.rows.length > 0);
+    const unnamed = [
+      ...new Map(
+        groups.filter((group) => !group.name).flatMap((group) => group.rows).map((row) => [row.entity_id, row])
+      ).values()
+    ];
+    const lines = [
+      ...groups.filter((group) => group.name).map((group) => ({ name: group.name, rows: group.rows })),
+      ...unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: void 0, rows: unnamed }] : []
+    ];
+    return b2`<div class="idle">
+            <ha-icon class="idle-icon" icon="mdi:check-circle-outline"></ha-icon>
+            <div class="idle-lines">
+                ${lines.map(({ name, rows }) => {
+      const unreachable = rows.filter((r6) => r6.unreachable).length;
+      const current = rows.length - unreachable;
+      const text = [
+        name,
+        current > 0 ? this.text("common.current_count", { n: current }) : "",
+        unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : ""
+      ].filter(Boolean).join(" \xB7 ");
+      return b2`<div class="idle-line">
+                        <ha-icon icon=${unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check"}></ha-icon>
+                        <span title=${text}>${text}</span>
+                    </div>`;
+    })}
+            </div>
+        </div>`;
+  }
+  /** Whether the card is held to a height that is set, fixed or in rows, and so may have room left under its content. */
+  setHeight() {
+    return this.heightStyle().startsWith("height");
   }
   /** A group while nothing waits: its rows up to date, then its line of those out of reach. */
   quietGroup(group) {
@@ -1522,7 +1765,7 @@ var UpdatesCard = class extends i4 {
       return A;
     }
     return b2`<div class="group">
-            ${group.name ? b2`<div class="grp-h">${group.name}<span class="n">${current.length}</span></div>` : A}
+            ${group.name ? b2`<div class="grp-h"><span class="grp-name" title=${group.name}>${group.name}</span><span class="n">${current.length}</span></div>` : A}
             ${current.length > 0 ? b2`<div class="grp-body">${keyed(current, (r6) => this.currentRow(r6))}</div>` : A}
             ${this.unreachableLine(group, unreachable)}
         </div>`;
@@ -1534,7 +1777,7 @@ var UpdatesCard = class extends i4 {
     const unreachable = group.rows.filter((r6) => r6.unreachable && !this.installs.has(r6.entity_id));
     const current = mine.filter((s5) => !active.includes(s5) && !s5.row.unreachable).map((s5) => s5.row);
     const rest = b2`<div class="grp-body">${keyed(current, (r6) => this.currentRow(r6))}</div>`;
-    const header = group.name ? b2`<div class="grp-h">${group.name}</div>` : A;
+    const header = group.name ? b2`<div class="grp-h"><span class="grp-name" title=${group.name}>${group.name}</span></div>` : A;
     const quiet = active.length === 0 && unreachable.length === 0;
     if (quiet && current.length === 0) {
       return A;
@@ -1733,6 +1976,7 @@ var UpdatesCard = class extends i4 {
       opened.add(key);
     }
     this.opened = opened;
+    this.slide();
   }
   heightStyle() {
     return heightStyle(this.config ?? {}, this.layout, this.minimumHeight());
@@ -1901,6 +2145,12 @@ var UpdatesCard = class extends i4 {
 
                 .seg.done {
                     background: var(--success-color, #43a047);
+                }
+
+                /* The room a whole row leaves over goes under the header. */
+                .list,
+                .message {
+                    margin-top: var(--uc-spare, 0px);
                 }
 
                 .list {
@@ -2188,7 +2438,8 @@ var UpdatesCard = class extends i4 {
                     gap: 12px;
                     width: 100%;
                     box-sizing: border-box;
-                    padding: 12px 12px 12px 16px;
+                    padding: calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 12px
+                        calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 16px;
                 }
 
                 .one .ok {
@@ -2281,12 +2532,110 @@ var UpdatesCard = class extends i4 {
                     }
                 }
 
+                /* Held to a height, the texts above the list and the line under it keep to one line, cut short with their text as a tooltip. */
+                .held .hd-title,
+                .held .hd-sub,
+                .held .grp-name,
+                .held .one-title,
+                .held .one-sum,
+                .held .switch-text {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .held .one {
+                    flex-wrap: nowrap;
+                }
+
+                /* Held and shut, the room under the line goes to the check and the groups' lines instead of the list. */
+                .held .list.shut {
+                    flex: none;
+                }
+
+                /* With more groups than fit, it scrolls from its top. The list is shut, so it is the card's only scroller. */
+                .idle {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    scrollbar-width: thin;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: safe center;
+                    gap: 4px;
+                    padding: 0 16px 12px;
+                    color: var(--secondary-text-color);
+                }
+
+                .idle-icon {
+                    --mdc-icon-size: 48px;
+                    flex: none;
+                    margin-bottom: 4px;
+                    color: var(--success-color, #43a047);
+                    opacity: 0.5;
+                }
+
+                /* The lines are centred as one block, so their icons line up. */
+                .idle-lines {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    min-width: 0;
+                    max-width: 100%;
+                }
+
+                .idle-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    max-width: 100%;
+                    font-size: 12px;
+                    line-height: 16px;
+                    --mdc-icon-size: 16px;
+                }
+
+                .idle-line ha-icon {
+                    flex: none;
+                }
+
+                .idle-line span {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .held .one-sum {
+                    flex: 0 1 auto;
+                }
+
+                .grp-name {
+                    flex: 0 1 auto;
+                }
+
+                /* The rows the card fills, and the room under the header, change along with a slide, not on ha-card's own timing. */
+                ha-card.sliding {
+                    transition: min-height var(--ha-animation-duration-normal, 250ms) ease;
+                }
+
+                ha-card.sliding > .list,
+                ha-card.sliding > .one {
+                    transition:
+                        margin var(--ha-animation-duration-normal, 250ms) ease,
+                        padding var(--ha-animation-duration-normal, 250ms) ease;
+                }
+
                 @media (prefers-reduced-motion: reduce) {
                     .spin {
                         animation: none;
                     }
 
-                    .fold {
+                    .fold,
+                    ha-card.sliding,
+                    ha-card.sliding > .list,
+                    ha-card.sliding > .one {
                         transition: none;
                     }
                 }
@@ -2316,9 +2665,22 @@ __decorateClass([
 __decorateClass([
   r5()
 ], UpdatesCard.prototype, "now", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "filled", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "spare", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "sliding", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "width", 2);
 UpdatesCard = __decorateClass([
   t3("updates-card")
 ], UpdatesCard);
 export {
-  UpdatesCard
+  UpdatesCard,
+  endHeight
 };

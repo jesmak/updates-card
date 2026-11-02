@@ -18,6 +18,7 @@ import "./editor";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
+import { filledHeight, validRowStep } from "./rows";
 import type { ActionConfig, Bunch, Group, Row, UpdatesCardConfig } from "./types";
 import { bunchesOf, groupsOf, scriptOf, statusOf } from "./updates";
 import type { Install, Status } from "./updates";
@@ -45,6 +46,79 @@ registry.customCards.push({
     documentationURL: "https://github.com/jesmak/updates-card",
     preview: true,
 });
+
+/**
+ * The parts of a held card besides its first row: the header with the round button of a narrow card, the status line,
+ * the list's top padding and a group's header above it, the line of those up to date below the list, and the card's border.
+ */
+const HELD_FRAME_PX = 44 + 19 + 6 + 29 + 37 + 2;
+
+/** A waiting row's or a bunch's height on a card this wide or wider, its name and versions wrapping as the width needs. */
+const FIRST_ROW_PX: [number, number][] = [
+    [288, 44],
+    [214, 58],
+    [0, 73],
+];
+
+/**
+ * The narrowest card a column count gives, which is on a 320 px phone: 288 px of card at 12 columns, 214 at 9 and 140 at
+ * 6. A section beside others is wider (307, 228 and 150).
+ */
+function narrowestWidth(columns: number): number {
+    return columns >= 12 ? 288 : columns >= 9 ? 214 : 140;
+}
+
+const px = (value: string) => parseFloat(value) || 0;
+
+/** The parts the card itself puts in its ha-card, one after another. */
+const CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".one", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
+
+/**
+ * An element's height once every fold in it has slid open or shut, so the card is on its rows as a slide begins. A shut
+ * fold ends at nothing. An open one ends at its content's height, measured from where its last part ends, as its box is
+ * clipped while it slides. Parts follow one another, or with the groups side by side, each row of them is as tall as its
+ * tallest.
+ */
+export function endHeight(element: HTMLElement): number {
+    if (element.classList.contains("fold")) {
+        const inner = element.firstElementChild as HTMLElement | null;
+        const last = inner?.lastElementChild as HTMLElement | null;
+        if (!element.classList.contains("open") || !inner || !last) {
+            return 0;
+        }
+        const natural = last.getBoundingClientRect().bottom + px(getComputedStyle(last).marginBottom) - inner.getBoundingClientRect().top;
+        return natural + childChange(inner);
+    }
+    if (!element.querySelector(".fold")) {
+        return element.getBoundingClientRect().height;
+    }
+    const style = getComputedStyle(element);
+    if (style.display !== "grid") {
+        return element.getBoundingClientRect().height + childChange(element);
+    }
+    const columns = style.gridTemplateColumns.split(" ").length;
+    const placed = [...element.children]
+        .map((child, index) => ({ child: child as HTMLElement, index, order: parseInt(getComputedStyle(child).order) || 0 }))
+        .sort((a, b) => a.order - b.order || a.index - b.index)
+        .map(({ child }) => child);
+    let height = px(style.paddingTop) + px(style.paddingBottom);
+    for (let start = 0; start < placed.length; start += columns) {
+        height += Math.max(...placed.slice(start, start + columns).map((child) => endHeight(child)));
+    }
+    return height;
+}
+
+/** How much the children of an element that lays them out one after another change in height as their folds slide. */
+function childChange(element: HTMLElement): number {
+    let change = 0;
+    for (const child of element.children) {
+        change += endHeight(child as HTMLElement) - child.getBoundingClientRect().height;
+    }
+    return change;
+}
+
+/** The one line's own padding above and below, to which the spare room of a whole row is added. */
+const ONE_PADDING_PX = 12;
 
 /** A row as shown: a finished one keeps the version it moved from, so it stays with its bunch. */
 interface Shown {
@@ -81,7 +155,17 @@ export class UpdatesCard extends LitElement {
     /** The installs the card follows, by entity, until the page is reloaded. */
     @state() private installs = new Map<string, Install>();
     @state() private now = Date.now();
+    /** On automatic rows in a sections view, the height that ends on the card's row step, and what of it the content leaves over. */
+    @state() private filled = 0;
+    @state() private spare = 0;
+    /** Whether a fold is sliding open or shut, so the rows the card fills move with it. */
+    @state() private sliding = false;
+    /** The card's width when last measured, 0 before it is drawn. */
+    @state() private width = 0;
     private timer?: number;
+    private slideTimer?: number;
+    private frame?: number;
+    private readonly resizes = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => this.measureSoon());
     /** Whether the install-all script was running at the last update, whether its run has taken on its rows, and when it last stopped. */
     private running = false;
     private tookOn = false;
@@ -94,8 +178,9 @@ export class UpdatesCard extends LitElement {
 
     constructor() {
         super();
-        // Fades the list's edges while the card is held to a height, through the card's own lifecycle.
-        new ScrollFade(this, () => (this.heightStyle() ? this.renderRoot.querySelectorAll<HTMLElement>(".list") : []));
+        // Fades the edges of what scrolls while the card is held to a height, the list or the groups' lines under the one
+        // shut line, through the card's own lifecycle.
+        new ScrollFade(this, () => (this.heightStyle() ? this.renderRoot.querySelectorAll<HTMLElement>(".list, .idle") : []));
     }
 
     public static getConfigElement(): HTMLElement {
@@ -113,6 +198,9 @@ export class UpdatesCard extends LitElement {
         if (!validHeight(config)) {
             throw new Error(translate(browserLanguage(), "common.invalid_height"));
         }
+        if (!validRowStep(config)) {
+            throw new Error(translate(browserLanguage(), "common.invalid_row_step"));
+        }
         this.config = { ...config };
     }
 
@@ -125,9 +213,25 @@ export class UpdatesCard extends LitElement {
         return { columns: 12, min_columns: 6, rows: "auto", min_rows: gridMinRows(this.minimumHeight()) };
     }
 
-    /** Held to a height, the header, the status line, one group's first row and the line of those up to date still fit. */
+    /**
+     * Held to a height, the header, the status line, a group's header, its first row and the line of those up to date still
+     * fit, at the narrowest the card's columns allow or at its measured width if narrower. The texts above the list keep
+     * to one line then. The progress bar of an update-all run takes its room from the list while the run goes on.
+     */
     private minimumHeight(): number {
-        return 170;
+        const narrowest = Math.min(narrowestWidth(this.gridColumns()), this.width || Infinity);
+        return HELD_FRAME_PX + FIRST_ROW_PX.find(([width]) => narrowest >= width)![1];
+    }
+
+    /** The columns set in the layout tab, in either form Home Assistant has saved them, or a whole section. */
+    private gridColumns(): number {
+        const config = this.config as { grid_options?: { columns?: unknown }; layout_options?: { grid_columns?: unknown } } | undefined;
+        const columns = config?.grid_options
+            ? config.grid_options.columns
+            : typeof config?.layout_options?.grid_columns === "number"
+              ? config.layout_options.grid_columns * 3
+              : undefined;
+        return typeof columns === "number" ? columns : 12;
     }
 
     public connectedCallback(): void {
@@ -139,7 +243,116 @@ export class UpdatesCard extends LitElement {
         super.disconnectedCallback();
         window.clearInterval(this.timer);
         this.timer = undefined;
+        this.resizes?.disconnect();
+        cancelAnimationFrame(this.frame ?? 0);
+        window.clearTimeout(this.slideTimer);
+        this.sliding = false;
     }
+
+    protected updated(): void {
+        if (!this.isConnected) {
+            return;
+        }
+        const card = this.renderRoot.querySelector("ha-card");
+        if (card) {
+            this.resizes?.observe(card);
+        }
+        this.measureSoon();
+    }
+
+    private measureSoon(): void {
+        cancelAnimationFrame(this.frame ?? 0);
+        this.frame = requestAnimationFrame(() => this.fillRows());
+    }
+
+    /**
+     * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
+     * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the header, or while
+     * the card is one shut line, into that line. Measured to where the folds' slides end rather than where they are, so
+     * the card is on its rows as a slide begins.
+     */
+    private fillRows(): void {
+        const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
+        if (!card || !card.clientWidth) {
+            return;
+        }
+        // The card's whole width, border included, as the widths the columns give are.
+        const width = Math.round(card.getBoundingClientRect().width);
+        if (width !== this.width) {
+            this.width = width;
+        }
+        if (this.layout !== "grid" || this.heightStyle()) {
+            if (this.filled) this.filled = 0;
+            if (this.spare) this.spare = 0;
+            return;
+        }
+        // The card's parts one after another, never the card's own height, which is the min-height set here. The list grows
+        // into a height given to the card, so only its content counts.
+        const style = getComputedStyle(card);
+        let content = px(style.borderTopWidth) + px(style.borderBottomWidth) + px(style.paddingTop) + px(style.paddingBottom);
+        // Only the card's own parts, never an element a theme adds to it.
+        for (const part of card.querySelectorAll(CARD_PARTS)) {
+            const partStyle = getComputedStyle(part);
+            const inner = part.classList.contains("list") ? (part.firstElementChild as HTMLElement | null) : null;
+            const height = part.classList.contains("list") ? (inner ? endHeight(inner) : 0) : part.getBoundingClientRect().height;
+            content += px(partStyle.marginTop) + height + px(partStyle.marginBottom);
+        }
+        content -= this.spareShown(card);
+        const filled = filledHeight(Math.round(content), this.config ?? {});
+        const spare = Math.max(0, Math.floor(filled - content));
+        if (filled !== this.filled) {
+            this.filled = filled;
+        }
+        if (spare !== this.spare) {
+            this.spare = spare;
+        }
+    }
+
+    /** The spare room as drawn now, which while a fold slides is somewhere between the old and the new. */
+    private spareShown(card: HTMLElement): number {
+        const one = card.querySelector<HTMLElement>(":scope > .one");
+        const below = card.querySelector<HTMLElement>(":scope > .list, :scope > .message");
+        const style = one ? getComputedStyle(one) : undefined;
+        const inLine = style ? (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) - 2 * ONE_PADDING_PX : 0;
+        return Math.max(0, inLine) + Math.max(0, below ? parseFloat(getComputedStyle(below).marginTop) || 0 : 0);
+    }
+
+    /**
+     * The card's inline style: the height it is held to, or the rows it fills, with their spare room under the header or,
+     * `inLine`, in the one line the card is while shut.
+     */
+    private cardStyle(inLine = false): string {
+        const held = this.heightStyle();
+        if (held || !this.filled) {
+            return held;
+        }
+        return `min-height: ${this.filled}px; --uc-spare: ${inLine ? 0 : this.spare}px; --uc-line-spare: ${inLine ? this.spare : 0}px`;
+    }
+
+    /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
+    private cardClass(): string {
+        return [this.heightStyle() && "held", this.sliding && "sliding"].filter(Boolean).join(" ");
+    }
+
+    private readonly toggleAll = (): void => {
+        this.open = !this.open;
+        this.slide();
+    };
+
+    /** A fold set sliding: the card fills its rows along with the slide until the slide's end, or a second in case none comes. */
+    private slide(): void {
+        this.sliding = true;
+        window.clearTimeout(this.slideTimer);
+        this.slideTimer = window.setTimeout(() => (this.sliding = false), 1000);
+    }
+
+    private readonly slid = (event: TransitionEvent): void => {
+        const target = event.target as HTMLElement;
+        if (event.propertyName === "grid-template-rows" && target.classList?.contains("fold")) {
+            window.clearTimeout(this.slideTimer);
+            this.sliding = false;
+        }
+    };
 
     protected shouldUpdate(changed: PropertyValues): boolean {
         if (!this.config || !changed.has("hass") || changed.size > 1) {
@@ -267,8 +480,8 @@ export class UpdatesCard extends LitElement {
         const title = this.config.title ?? this.text("common.title");
         const all = new Map(this.groupList.flatMap((g) => g.rows.map((r) => [r.entity_id, r] as const)));
         if (all.size === 0) {
-            return html`<ha-card style=${this.heightStyle()}>
-                <div class="hd"><div class="hd-title">${title}</div></div>
+            return html`<ha-card class=${this.cardClass()} style=${this.cardStyle()}>
+                <div class="hd"><div class="hd-title" title=${title}>${title}</div></div>
                 <div class="message">${this.text("common.no_entities")}</div>
             </ha-card>`;
         }
@@ -304,25 +517,23 @@ export class UpdatesCard extends LitElement {
             </button>`;
         }
 
+        const status = this.statusLine(active, runs);
+        const currentText = this.text("common.current_count", { n: current.length });
         return html`
-            <ha-card style=${this.heightStyle()}>
+            <ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
                 <div class="hd">
-                    <div class="hd-title">${title}</div>
+                    <div class="hd-title" title=${title}>${title}</div>
                     ${action}
                 </div>
-                <div class="hd-sub">${this.statusLine(active, runs)}</div>
+                <div class="hd-sub" title=${status}>${status}</div>
                 ${this.running && runs.length > 0 ? this.progress(runs) : nothing}
                 <div class="list">
                     <div class="cols">${this.groupList.map((group) => this.waitingGroup(group, shown, busy))}</div>
                 </div>
                 ${
                     current.length > 0
-                        ? html`<button
-                              class="switch"
-                              aria-expanded=${this.open ? "true" : "false"}
-                              @click=${() => (this.open = !this.open)}
-                          >
-                              <span>${this.text("common.current_count", { n: current.length })}</span>
+                        ? html`<button class="switch" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
+                              <span class="switch-text" title=${currentText}>${currentText}</span>
                               <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
                           </button>`
                         : nothing
@@ -337,17 +548,65 @@ export class UpdatesCard extends LitElement {
             unreachable > 0
                 ? this.text("common.current_unreachable", { n: unreachable })
                 : this.text("common.all_current_count", { n: current });
-        return html`<ha-card style=${this.heightStyle()}>
-            <button class="one" aria-expanded=${this.open ? "true" : "false"} @click=${() => (this.open = !this.open)}>
+        return html`<ha-card class=${this.cardClass()} style=${this.cardStyle(!this.open)} @transitionend=${this.slid}>
+            <button class="one" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
                 <ha-icon class="ok" icon="mdi:check-circle-outline"></ha-icon>
-                <span class="one-title">${title}</span>
-                <span class="one-sum">${summary}</span>
+                <span class="one-title" title=${title}>${title}</span>
+                <span class="one-sum" title=${summary}>${summary}</span>
                 <ha-icon class="chev" icon=${this.open ? "mdi:chevron-up" : "mdi:chevron-down"}></ha-icon>
             </button>
-            <div class="list">
+            <div class="list ${this.open ? "" : "shut"}">
                 ${this.fold(this.open, html`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
             </div>
+            ${this.setHeight() && !this.open ? this.idle() : nothing}
         </ha-card>`;
+    }
+
+    /**
+     * The room a card held to a set height has under its one shut line: a check, and a line for each named group with
+     * devices, with how many are up to date and how many out of reach. The groups without a name share a line when a named
+     * group has one too. More lines than fit scroll.
+     */
+    private idle(): TemplateResult {
+        const groups = this.groupList.filter((group) => group.rows.length > 0);
+        // A device two of them hold counts once, as on the card's own line.
+        const unnamed = [
+            ...new Map(
+                groups
+                    .filter((group) => !group.name)
+                    .flatMap((group) => group.rows)
+                    .map((row) => [row.entity_id, row] as const),
+            ).values(),
+        ];
+        const lines = [
+            ...groups.filter((group) => group.name).map((group) => ({ name: group.name, rows: group.rows })),
+            ...(unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: undefined, rows: unnamed }] : []),
+        ];
+        return html`<div class="idle">
+            <ha-icon class="idle-icon" icon="mdi:check-circle-outline"></ha-icon>
+            <div class="idle-lines">
+                ${lines.map(({ name, rows }) => {
+                    const unreachable = rows.filter((r) => r.unreachable).length;
+                    const current = rows.length - unreachable;
+                    const text = [
+                        name,
+                        current > 0 ? this.text("common.current_count", { n: current }) : "",
+                        unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : "",
+                    ]
+                        .filter(Boolean)
+                        .join(" · ");
+                    return html`<div class="idle-line">
+                        <ha-icon icon=${unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check"}></ha-icon>
+                        <span title=${text}>${text}</span>
+                    </div>`;
+                })}
+            </div>
+        </div>`;
+    }
+
+    /** Whether the card is held to a height that is set, fixed or in rows, and so may have room left under its content. */
+    private setHeight(): boolean {
+        return this.heightStyle().startsWith("height");
     }
 
     /** A group while nothing waits: its rows up to date, then its line of those out of reach. */
@@ -358,7 +617,7 @@ export class UpdatesCard extends LitElement {
             return nothing;
         }
         return html`<div class="group">
-            ${group.name ? html`<div class="grp-h">${group.name}<span class="n">${current.length}</span></div>` : nothing}
+            ${group.name ? html`<div class="grp-h"><span class="grp-name" title=${group.name}>${group.name}</span><span class="n">${current.length}</span></div>` : nothing}
             ${current.length > 0 ? html`<div class="grp-body">${keyed(current, (r) => this.currentRow(r))}</div>` : nothing}
             ${this.unreachableLine(group, unreachable)}
         </div>`;
@@ -371,7 +630,9 @@ export class UpdatesCard extends LitElement {
         const unreachable = group.rows.filter((r) => r.unreachable && !this.installs.has(r.entity_id));
         const current = mine.filter((s) => !active.includes(s) && !s.row.unreachable).map((s) => s.row);
         const rest = html`<div class="grp-body">${keyed(current, (r) => this.currentRow(r))}</div>`;
-        const header = group.name ? html`<div class="grp-h">${group.name}</div>` : nothing;
+        const header = group.name
+            ? html`<div class="grp-h"><span class="grp-name" title=${group.name}>${group.name}</span></div>`
+            : nothing;
         const quiet = active.length === 0 && unreachable.length === 0;
         if (quiet && current.length === 0) {
             return nothing;
@@ -596,6 +857,7 @@ export class UpdatesCard extends LitElement {
             opened.add(key);
         }
         this.opened = opened;
+        this.slide();
     }
 
     private heightStyle(): string {
@@ -774,6 +1036,12 @@ export class UpdatesCard extends LitElement {
 
                 .seg.done {
                     background: var(--success-color, #43a047);
+                }
+
+                /* The room a whole row leaves over goes under the header. */
+                .list,
+                .message {
+                    margin-top: var(--uc-spare, 0px);
                 }
 
                 .list {
@@ -1061,7 +1329,8 @@ export class UpdatesCard extends LitElement {
                     gap: 12px;
                     width: 100%;
                     box-sizing: border-box;
-                    padding: 12px 12px 12px 16px;
+                    padding: calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 12px
+                        calc(${ONE_PADDING_PX}px + var(--uc-line-spare, 0px) / 2) 16px;
                 }
 
                 .one .ok {
@@ -1154,12 +1423,110 @@ export class UpdatesCard extends LitElement {
                     }
                 }
 
+                /* Held to a height, the texts above the list and the line under it keep to one line, cut short with their text as a tooltip. */
+                .held .hd-title,
+                .held .hd-sub,
+                .held .grp-name,
+                .held .one-title,
+                .held .one-sum,
+                .held .switch-text {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .held .one {
+                    flex-wrap: nowrap;
+                }
+
+                /* Held and shut, the room under the line goes to the check and the groups' lines instead of the list. */
+                .held .list.shut {
+                    flex: none;
+                }
+
+                /* With more groups than fit, it scrolls from its top. The list is shut, so it is the card's only scroller. */
+                .idle {
+                    flex: 1 1 auto;
+                    min-height: 0;
+                    overflow-y: auto;
+                    scrollbar-width: thin;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: safe center;
+                    gap: 4px;
+                    padding: 0 16px 12px;
+                    color: var(--secondary-text-color);
+                }
+
+                .idle-icon {
+                    --mdc-icon-size: 48px;
+                    flex: none;
+                    margin-bottom: 4px;
+                    color: var(--success-color, #43a047);
+                    opacity: 0.5;
+                }
+
+                /* The lines are centred as one block, so their icons line up. */
+                .idle-lines {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    min-width: 0;
+                    max-width: 100%;
+                }
+
+                .idle-line {
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    max-width: 100%;
+                    font-size: 12px;
+                    line-height: 16px;
+                    --mdc-icon-size: 16px;
+                }
+
+                .idle-line ha-icon {
+                    flex: none;
+                }
+
+                .idle-line span {
+                    min-width: 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+
+                .held .one-sum {
+                    flex: 0 1 auto;
+                }
+
+                .grp-name {
+                    flex: 0 1 auto;
+                }
+
+                /* The rows the card fills, and the room under the header, change along with a slide, not on ha-card's own timing. */
+                ha-card.sliding {
+                    transition: min-height var(--ha-animation-duration-normal, 250ms) ease;
+                }
+
+                ha-card.sliding > .list,
+                ha-card.sliding > .one {
+                    transition:
+                        margin var(--ha-animation-duration-normal, 250ms) ease,
+                        padding var(--ha-animation-duration-normal, 250ms) ease;
+                }
+
                 @media (prefers-reduced-motion: reduce) {
                     .spin {
                         animation: none;
                     }
 
-                    .fold {
+                    .fold,
+                    ha-card.sliding,
+                    ha-card.sliding > .list,
+                    ha-card.sliding > .one {
                         transition: none;
                     }
                 }

@@ -46,14 +46,15 @@ it, and offers to stop it.
 
 Every option can be set in the card's visual editor.
 
-| Name             | Type   | Description                                                                                                                                                                                                                                 | Default                                                                         |
-| ---------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `title`          | string | The card's title                                                                                                                                                                                                                            | "Updates" in the viewer's language                                              |
-| `groups`         | list   | The groups, each with the options below                                                                                                                                                                                                     | Every update entity in one group                                                |
-| `install_action` | action | What the **Update all** button does, as any dashboard action. A script is followed while it runs (below). Without it, there is no such button                                                                                               |                                                                                 |
-| `height_mode`    | string | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the list scrolls. A height in grid rows, set in the layout tab of a sections view, is used instead | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
-| `height`         | number | The card's height in pixels, for `fixed`                                                                                                                                                                                                    |                                                                                 |
-| `max_height`     | number | The card's greatest height in pixels, for `max`                                                                                                                                                                                             |                                                                                 |
+| Name             | Type   | Description                                                                                                                                                                                                                                                                                             | Default                                                                         |
+| ---------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `title`          | string | The card's title                                                                                                                                                                                                                                                                                        | "Updates" in the viewer's language                                              |
+| `groups`         | list   | The groups, each with the options below                                                                                                                                                                                                                                                                 | Every update entity in one group                                                |
+| `install_action` | action | What the **Update all** button does, as any dashboard action. A script is followed while it runs (below). Without it, there is no such button                                                                                                                                                           |                                                                                 |
+| `height_mode`    | string | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the list scrolls. A height in grid rows, set in the layout tab of a sections view, is used instead                                                             | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
+| `height`         | number | The card's height in pixels, for `fixed`                                                                                                                                                                                                                                                                |                                                                                 |
+| `max_height`     | number | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                                                         |                                                                                 |
+| `row_step`       | string | How the card rounds its height on automatic rows in a sections view, with `height_mode` `auto`. `full` rounds up to whole rows, with the room left over under the header, and `half` to half rows, which saves space but may leave the cards under it half a row off the rows of the sections beside it | `full`                                                                          |
 
 A group holds the update entities of an integration, in some areas or outside them, or exactly the ones listed.
 
@@ -111,8 +112,18 @@ The card takes a whole section by default and can be made as narrow as half of o
 all** button shows only its icon. From 700 pixels on, the groups go side by side, two to a row.
 
 Held to a height, by `height_mode` or by rows in a sections view, the header, the status line and the line of those up
-to date stay in view and the groups scroll between them. The card never gets lower than these and one group's first
-row need, which is three rows in a sections view.
+to date stay in view and the groups scroll between them. The title, the status line, the group names and that line then
+keep to one line each, cut short with an ellipsis when they are longer, with the whole text as a tooltip. The card never
+gets lower than these and one group's first row need, which is three rows in a sections view on a whole section and
+four when narrower, as a row's name and versions wrap there. Longer names and versions scroll the rest of the first row
+with the list. While an **Update all** script runs, its progress bar takes its room from the list.
+
+With nothing waiting, a card held to a set height, fixed or in rows, shows a check under its one line, with a line for
+each named group with devices saying how many of them are up to date and how many are unreachable. The groups without a
+name share a line when a named group has one too. When there are more lines than fit, they scroll.
+
+On automatic rows in a sections view the card takes whole rows, so the cards under it stay on the rows, or with
+`row_step: half` half rows. The room left over goes under the header, or while the card is one line, into that line.
 
 ## Examples
 
@@ -180,6 +191,9 @@ file HACS installs and is committed to the repository.
 | `src/updates-card.ts`     | The card itself, and how it follows installs                                        |
 | `src/editor.ts`           | The visual editor                                                                   |
 | `src/updates.ts`          | Choosing each group's entities, the rows, unreachable devices, folding and statuses |
+| `src/height.ts`           | The height mode, shared with the author's other cards                               |
+| `src/rows.ts`             | Rounding to the rows of a sections view, shared with the author's other cards       |
+| `src/fade.ts`             | The fading edges of what scrolls, shared with the author's other cards              |
 | `src/localize/languages/` | The card's texts, one JSON file per language                                        |
 | `docs/screenshots.json`   | The made-up data the README's screenshots are taken from                            |
 | `tests/`                  | Tests, run with vitest                                                              |

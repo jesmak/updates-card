@@ -1,5 +1,5 @@
-import type { HeightConfig } from "./height";
 import type { LovelaceCardConfig } from "./hass";
+import type { RowStepConfig } from "./rows";
 
 /**
  * Which update entities a group holds. With `entities`, exactly those. Otherwise every update entity that matches the
@@ -25,7 +25,7 @@ export interface ActionConfig {
     [key: string]: unknown;
 }
 
-export interface UpdatesCardConfig extends LovelaceCardConfig, HeightConfig {
+export interface UpdatesCardConfig extends LovelaceCardConfig, RowStepConfig {
     /** Shown at the top of the card. Without one the card is titled in the viewer's language. */
     title?: string;
     /** Without groups, every update entity in one group without a name. */

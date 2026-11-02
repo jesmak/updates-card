@@ -207,6 +207,52 @@ describe("updates-card", () => {
         expect(["fade-top", "fade-bottom"].filter((name) => list.classList.contains(name))).toEqual(expected);
     });
 
+    it("fades the bottom edge of the groups' lines under a held card's one line, and lets go of them when the list opens", async () => {
+        const element = await quiet({ height: 300 });
+        const idle = one(element, ".idle") as HTMLElement;
+        Object.defineProperty(idle, "scrollHeight", { value: 600, configurable: true });
+        Object.defineProperty(idle, "clientHeight", { value: 200, configurable: true });
+        element.requestUpdate();
+        await element.updateComplete;
+        expect([...idle.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
+        (one(element, ".one") as HTMLElement).click();
+        await element.updateComplete;
+        expect(one(element, ".idle")).toBeNull();
+        expect([...idle.classList].filter((name) => name.startsWith("fade"))).toEqual([]);
+    });
+
+    it("fills its rows by its own parts, never by an element a theme adds to it", async () => {
+        const element = await quiet({}, "grid");
+        const haCard = one(element, "ha-card") as HTMLElement;
+        const box = (target: Element, height: number, width = 300) =>
+            (target.getBoundingClientRect = () => ({ top: 0, bottom: height, height, width }) as DOMRect);
+        Object.defineProperty(haCard, "clientWidth", { value: 300, configurable: true });
+        box(haCard, 56);
+        const line = one(element, ".one") as HTMLElement;
+        box(line, 48);
+        const fill = async () => {
+            (element as unknown as { fillRows(): void }).fillRows();
+            await element.updateComplete;
+            return haCard.getAttribute("style") ?? "";
+        };
+        const own = await fill();
+        expect(own).toMatch(/^min-height: \d+px/);
+        const themed = document.createElement("div");
+        box(themed, 500);
+        haCard.append(themed);
+        expect(await fill()).toBe(own);
+        box(line, 248);
+        expect(await fill()).not.toBe(own);
+    });
+
+    it.each([
+        ["with updates waiting", home(WAITING), CONFIG.groups!],
+        ["with no entities", home({ installed: "2026.2.0" }), [{ name: "Nothing", entities: ["update.not_there"] }]],
+    ])("held to a set height, shows no check %s", async (_name, hass, groups) => {
+        const element = await card(hass, { ...CONFIG, groups, height: 300 });
+        expect(one(element, ".idle")).toBeNull();
+    });
+
     it("lets go of the list's fade when the card goes from held to auto, and fades it again when held again", async () => {
         const element = await card(home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" }), { ...CONFIG, height: 300 });
         const list = one(element, ".list") as HTMLElement;
@@ -223,11 +269,170 @@ describe("updates-card", () => {
         expect([...list.classList].filter((name) => name.startsWith("fade"))).toEqual(["fades", "fade-bottom"]);
     });
 
-    it("asks a sections view for the rows its header, one row and the bottom line need, and is never held lower", async () => {
-        const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, height: 100 });
-        expect(element.getGridOptions()).toMatchObject({ rows: "auto", min_rows: 3 });
-        expect(one(element, "ha-card")!.getAttribute("style")).toBe("height: 170px");
+    /** The card with nothing waiting, these entities out of reach, and its list opened when asked. */
+    async function quiet(config: Partial<UpdatesCardConfig>, layout?: string, down: string[] = [], open = false): Promise<UpdatesCard> {
+        const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, ...config }, layout);
+        const states = { ...element.hass!.states };
+        for (const id of down) {
+            states[id] = { ...states[id]!, state: "unavailable" };
+        }
+        Object.defineProperty(element, "hass", { configurable: true, value: { ...element.hass!, states } });
+        element.requestUpdate();
+        await element.updateComplete;
+        if (open) {
+            (one(element, ".one") as HTMLElement).click();
+            await element.updateComplete;
+        }
+        return element;
+    }
+
+    // Only a height that is set leaves room to fill. One that fits the content, or grows up to a limit, has none.
+    it.each([
+        ["fitting its content", {}, undefined, false, false],
+        ["growing up to a limit", { max_height: 300 }, undefined, false, false],
+        ["at a fixed height", { height_mode: "fixed" as const, height: 300 }, undefined, false, true],
+        ["at a fixed height, opened", { height: 300 }, undefined, true, false],
+        ["on rows set in the layout tab", { grid_options: { rows: 4 } }, "grid", false, true],
+        ["on rows set in the layout tab, opened", { grid_options: { rows: 4 } }, "grid", true, false],
+        ["on automatic rows, growing up to a limit", { max_height: 300, grid_options: { rows: "auto" } }, "grid", false, false],
+        ["on automatic rows, at a fixed height", { height: 300, grid_options: { rows: "auto" } }, "grid", false, true],
+        ["on automatic rows, fitting its content", { grid_options: { rows: "auto" } }, "grid", false, false],
+        ["on rows set in the layout tab, which win over a limit", { max_height: 300, grid_options: { rows: 4 } }, "grid", false, true],
+        ["on rows set in the layout tab's older form", { layout_options: { grid_rows: 4 } }, "grid", false, true],
+    ])("with nothing waiting, shows a check under its line %s only when held to a set height", async (_name, extra, layout, open, idle) => {
+        const element = await quiet(extra as Partial<UpdatesCardConfig>, layout, [], open);
+        expect(one(element, ".idle") !== null).toBe(idle);
+        expect(one(element, ".idle-icon") !== null).toBe(idle);
+        expect(one(element, ".one")!.getAttribute("aria-expanded")).toBe(open ? "true" : "false");
+        expect(all(element, ".list .row").length > 0).toBe(open);
     });
+
+    // A named group with devices has a line of its own. Groups without a name share one line, counting each device once. A
+    // card with no named group that has devices gets no line.
+    it.each([
+        ["two named groups", CONFIG.groups!, ["update.shed_2"], ["House · 4 up to date", "Shed · 2 up to date · 1 unreachable"]],
+        ["one group without a name", [{ integration: "esphome" }], ["update.shed_2"], []],
+        [
+            "two groups without names",
+            [
+                { integration: "esphome", exclude_areas: ["cabin"] },
+                { integration: "esphome", areas: ["cabin"] },
+            ],
+            ["update.shed_2"],
+            [],
+        ],
+        [
+            "a named group and one without a name",
+            [
+                { name: "House", integration: "esphome", exclude_areas: ["cabin"] },
+                { integration: "esphome", areas: ["cabin"] },
+            ],
+            ["update.shed_2"],
+            ["House · 4 up to date", "2 up to date · 1 unreachable"],
+        ],
+        [
+            "a group with every device out of reach",
+            CONFIG.groups!,
+            ["update.shed_0", "update.shed_1", "update.shed_2"],
+            ["House · 4 up to date", "Shed · 3 unreachable"],
+        ],
+        ["one named group alone", [{ name: "House", integration: "esphome" }], ["update.shed_2"], ["House · 6 up to date · 1 unreachable"]],
+        [
+            "a named group and two without names, which share a line",
+            [
+                { name: "House", integration: "esphome", exclude_areas: ["cabin"] },
+                { entities: ["update.shed_0"] },
+                { entities: ["update.shed_1", "update.shed_2"] },
+            ],
+            ["update.shed_2"],
+            ["House · 4 up to date", "2 up to date · 1 unreachable"],
+        ],
+        [
+            "a named group and one without a name with every device out of reach",
+            [
+                { name: "House", integration: "esphome", exclude_areas: ["cabin"] },
+                { integration: "esphome", areas: ["cabin"] },
+            ],
+            ["update.shed_0", "update.shed_1", "update.shed_2"],
+            ["House · 4 up to date", "3 unreachable"],
+        ],
+        [
+            "two groups without names that share a device, which counts once",
+            [
+                { name: "House", integration: "esphome", exclude_areas: ["cabin"] },
+                { entities: ["update.shed_0", "update.shed_1"] },
+                { entities: ["update.shed_1", "update.shed_2"] },
+            ],
+            ["update.shed_2"],
+            ["House · 4 up to date", "2 up to date · 1 unreachable"],
+        ],
+        [
+            "a named group with no devices and one without a name",
+            [{ name: "Nothing", entities: ["update.not_there"] }, { integration: "esphome" }],
+            [],
+            [],
+        ],
+        [
+            "a named group with no devices and one with them",
+            [
+                { name: "Nothing", entities: ["update.not_there"] },
+                { name: "House", integration: "esphome", exclude_areas: ["cabin"] },
+            ],
+            [],
+            ["House · 4 up to date"],
+        ],
+        [
+            "a named group with devices and one without a name and without them",
+            [{ name: "House", integration: "esphome", exclude_areas: ["cabin"] }, { entities: ["update.not_there"] }],
+            [],
+            ["House · 4 up to date"],
+        ],
+        [
+            "a device both a named group and one without a name hold, counted on both lines as both groups list it",
+            [{ name: "House", integration: "esphome", exclude_areas: ["cabin"] }, { entities: ["update.house_0", "update.shed_0"] }],
+            [],
+            ["House · 4 up to date", "2 up to date"],
+        ],
+    ])("held with nothing waiting, sums up %s under its line", async (_name, groups, down, lines) => {
+        const element = await quiet({ groups, height: 300 }, undefined, down);
+        expect(one(element, ".idle-icon")).not.toBeNull();
+        expect(all(element, ".idle-line").map(text)).toEqual(lines);
+        expect(all(element, ".idle-line span").map((span) => span.getAttribute("title"))).toEqual(lines);
+    });
+
+    it("gives every text a held card may cut short its own text as a tooltip", async () => {
+        const quietCard = await quiet({ height: 300 });
+        for (const selector of [".one-title", ".one-sum"]) {
+            const element = one(quietCard, selector)!;
+            expect(element.getAttribute("title")).toBe(text(element));
+        }
+        // The house's devices wait and the shed's are up to date, so the line of those up to date is there too.
+        const waiting = await card(home(WAITING, { installed: "2026.2.0" }), { ...CONFIG, height: 300 });
+        for (const selector of [".hd-title", ".hd-sub", ".grp-name", ".switch-text"]) {
+            const element = one(waiting, selector)!;
+            expect(element.getAttribute("title")).toBe(text(element));
+        }
+    });
+
+    it.each([
+        ["a whole section", {}, 3, 181],
+        ["twelve columns", { grid_options: { columns: 12 } }, 3, 181],
+        ["nine columns, where a row's name and versions take three lines", { grid_options: { columns: 9 } }, 4, 195],
+        ["six columns, where they take four", { grid_options: { columns: 6 } }, 4, 210],
+        ["the older form's two columns of four", { layout_options: { grid_columns: 2 } }, 4, 210],
+        ["a whole section in the older form", { layout_options: { grid_columns: "full" } }, 3, 181],
+    ])(
+        "asks a sections view on %s for the rows its header, one row and the bottom line need, and is never held lower",
+        async (_name, layout, rows, height) => {
+            const element = await card(home({ installed: "2026.2.0" }), {
+                ...CONFIG,
+                ...layout,
+                height: 100,
+            } as Partial<UpdatesCardConfig>);
+            expect(element.getGridOptions()).toMatchObject({ rows: "auto", min_rows: rows });
+            expect(one(element, "ha-card")!.getAttribute("style")).toBe(`height: ${height}px`);
+        },
+    );
 
     it.each([
         ["a maximum height", undefined, { max_height: 300 }, "max-height: 300px"],
