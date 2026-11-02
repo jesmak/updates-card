@@ -415,12 +415,12 @@ describe("updates-card", () => {
     });
 
     it.each([
-        ["a whole section", {}, 3, 181],
-        ["twelve columns", { grid_options: { columns: 12 } }, 3, 181],
-        ["nine columns, where a row's name and versions take three lines", { grid_options: { columns: 9 } }, 4, 195],
-        ["six columns, where they take four", { grid_options: { columns: 6 } }, 4, 210],
-        ["the older form's two columns of four", { layout_options: { grid_columns: 2 } }, 4, 210],
-        ["a whole section in the older form", { layout_options: { grid_columns: "full" } }, 3, 181],
+        ["a whole section", {}, 4, 189],
+        ["twelve columns", { grid_options: { columns: 12 } }, 4, 189],
+        ["nine columns, where a row's name and versions take three lines", { grid_options: { columns: 9 } }, 4, 203],
+        ["six columns, where they take four", { grid_options: { columns: 6 } }, 4, 218],
+        ["the older form's two columns of four", { layout_options: { grid_columns: 2 } }, 4, 218],
+        ["a whole section in the older form", { layout_options: { grid_columns: "full" } }, 4, 189],
     ])(
         "asks a sections view on %s for the rows its header, one row and the bottom line need, and is never held lower",
         async (_name, layout, rows, height) => {

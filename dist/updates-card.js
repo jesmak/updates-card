@@ -1325,7 +1325,7 @@ registry.customCards.push({
   documentationURL: "https://github.com/jesmak/updates-card",
   preview: true
 });
-var HELD_FRAME_PX = 44 + 19 + 6 + 29 + 37 + 2;
+var HELD_FRAME_PX = 44 + 19 + 6 + 29 + 8 + 37 + 2;
 var FIRST_ROW_PX = [
   [288, 44],
   [214, 58],
@@ -2545,6 +2545,16 @@ var UpdatesCard = class extends i4 {
                     text-overflow: ellipsis;
                 }
 
+                /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. */
+                .held .list {
+                    margin-right: 4px;
+                    margin-bottom: 8px;
+                }
+
+                .held .cols {
+                    padding-bottom: 0;
+                }
+
                 .held .one {
                     flex-wrap: nowrap;
                 }
@@ -2570,7 +2580,7 @@ var UpdatesCard = class extends i4 {
                 }
 
                 .idle-icon {
-                    --mdc-icon-size: 48px;
+                    --mdc-icon-size: 64px;
                     flex: none;
                     margin-bottom: 4px;
                     color: var(--success-color, #43a047);

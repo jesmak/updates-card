@@ -114,8 +114,7 @@ all** button shows only its icon. From 700 pixels on, the groups go side by side
 Held to a height, by `height_mode` or by rows in a sections view, the header, the status line and the line of those up
 to date stay in view and the groups scroll between them. The title, the status line, the group names and that line then
 keep to one line each, cut short with an ellipsis when they are longer, with the whole text as a tooltip. The card never
-gets lower than these and one group's first row need, which is three rows in a sections view on a whole section and
-four when narrower, as a row's name and versions wrap there. Longer names and versions scroll the rest of the first row
+gets lower than these and one group's first row need, which is four rows in a sections view. Longer names and versions scroll the rest of the first row
 with the list. While an **Update all** script runs, its progress bar takes its room from the list.
 
 With nothing waiting, a card held to a set height, fixed or in rows, shows a check under its one line, with a line for

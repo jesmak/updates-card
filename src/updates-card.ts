@@ -49,9 +49,10 @@ registry.customCards.push({
 
 /**
  * The parts of a held card besides its first row: the header with the round button of a narrow card, the status line,
- * the list's top padding and a group's header above it, the line of those up to date below the list, and the card's border.
+ * the list's top padding and a group's header above it, the list's bottom margin, the line of those up to date below the
+ * list, and the card's border.
  */
-const HELD_FRAME_PX = 44 + 19 + 6 + 29 + 37 + 2;
+const HELD_FRAME_PX = 44 + 19 + 6 + 29 + 8 + 37 + 2;
 
 /** A waiting row's or a bunch's height on a card this wide or wider, its name and versions wrapping as the width needs. */
 const FIRST_ROW_PX: [number, number][] = [
@@ -1436,6 +1437,16 @@ export class UpdatesCard extends LitElement {
                     text-overflow: ellipsis;
                 }
 
+                /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. */
+                .held .list {
+                    margin-right: 4px;
+                    margin-bottom: 8px;
+                }
+
+                .held .cols {
+                    padding-bottom: 0;
+                }
+
                 .held .one {
                     flex-wrap: nowrap;
                 }
@@ -1461,7 +1472,7 @@ export class UpdatesCard extends LitElement {
                 }
 
                 .idle-icon {
-                    --mdc-icon-size: 48px;
+                    --mdc-icon-size: 64px;
                     flex: none;
                     margin-bottom: 4px;
                     color: var(--success-color, #43a047);
