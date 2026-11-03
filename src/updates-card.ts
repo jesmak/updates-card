@@ -71,6 +71,12 @@ function narrowestWidth(columns: number): number {
 
 const px = (value: string) => parseFloat(value) || 0;
 
+/**
+ * Room for a measure read in fractions of a pixel, so a text exactly as wide as its room still fits. Smaller than the
+ * 1/64 px a browser lays out in.
+ */
+const SLACK_PX = 0.01;
+
 /** The gap above the line of those up to date while nothing waits, as the groups have above them while updates wait. */
 const QUIET_GAP_PX = 6;
 
@@ -163,6 +169,8 @@ export class UpdatesCard extends LitElement {
     @state() private sliding = false;
     /** The card's width when last measured, 0 before it is drawn. */
     @state() private width = 0;
+    /** As last measured, whether the waiting rows' and bunches' versions fit beside their names. */
+    @state() private beside = false;
     private timer?: number;
     private slideTimer?: number;
     private frame?: number;
@@ -263,7 +271,54 @@ export class UpdatesCard extends LitElement {
 
     private measureSoon(): void {
         cancelAnimationFrame(this.frame ?? 0);
-        this.frame = requestAnimationFrame(() => this.fillRows());
+        this.frame = requestAnimationFrame(() => {
+            this.measureBeside();
+            this.fillRows();
+        });
+    }
+
+    /**
+     * Puts the waiting rows' and bunches' versions beside their names only when they fit there: when a name's longest word,
+     * the gap and the whole version fit in the row's texts, and no row is taller than with its version under its name. Then
+     * every such row, shut folds' included, so the list keeps one layout. The list is held to its drawn height meanwhile,
+     * its overflow clipped, so nothing around it moves.
+     */
+    private measureBeside(): void {
+        const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
+        const list = card?.querySelector<HTMLElement>(":scope > .list");
+        const infos = list ? [...list.querySelectorAll<HTMLElement>(".row:not(.sib) > .info, .sum > .info")] : [];
+        if (!card || !list?.clientWidth || infos.length === 0) {
+            return;
+        }
+        const heights = (): number[] => infos.map((info) => px(getComputedStyle(info).height));
+        const was = card.classList.contains("beside");
+        // A computed height has six significant digits, which can fall short of the 1/64 px a browser lays out in, and the
+        // list held to that would shrink by a fraction while it is measured. So it is held to the 1/64 px it rounds to. Its
+        // content is held too, so a held list that scrolls keeps its place while the rows measured beside are shorter.
+        const content = list.firstElementChild as HTMLElement | null;
+        list.style.height = `${Math.round(px(getComputedStyle(list).height) * 64) / 64}px`;
+        list.style.overflow = "hidden";
+        list.style.overflowAnchor = "none";
+        content?.style.setProperty("min-height", `${Math.round(px(getComputedStyle(content).height) * 64) / 64}px`);
+        card.classList.remove("beside");
+        const under = heights();
+        card.classList.add("beside");
+        const sideBySide = heights();
+        card.classList.add("measuring");
+        const fits = infos.every((info, i) => {
+            const style = getComputedStyle(info);
+            const parts = [...info.children].reduce((sum, part) => sum + px(getComputedStyle(part).width), 0);
+            return parts + px(style.columnGap) <= px(style.width) + SLACK_PX && sideBySide[i] <= under[i] + SLACK_PX;
+        });
+        card.classList.remove("measuring");
+        card.classList.toggle("beside", was);
+        list.style.height = "";
+        list.style.overflow = "";
+        list.style.overflowAnchor = "";
+        content?.style.removeProperty("min-height");
+        if (fits !== this.beside) {
+            this.beside = fits;
+        }
     }
 
     /**
@@ -330,7 +385,7 @@ export class UpdatesCard extends LitElement {
 
     /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
     private cardClass(): string {
-        return [this.heightStyle() && "held", this.sliding && "sliding"].filter(Boolean).join(" ");
+        return [this.heightStyle() && "held", this.sliding && "sliding", this.beside && "beside"].filter(Boolean).join(" ");
     }
 
     private readonly toggleAll = (): void => {
@@ -1404,20 +1459,36 @@ export class UpdatesCard extends LitElement {
                     }
                 }
 
-                /* A wide group has room for a waiting row's versions beside its name. */
-                @container (min-width: 600px) {
-                    .row:not(.sib) .info,
-                    .sum .info {
-                        display: flex;
-                        align-items: baseline;
-                        justify-content: space-between;
-                        gap: 16px;
-                    }
+                /*
+                 * A waiting row's or a bunch's version goes beside its name when every one fits there, as measured, on one
+                 * line. Its name wraps between words only, as its longest word was measured to fit.
+                 */
+                .beside .row:not(.sib) > .info,
+                .beside .sum > .info {
+                    display: flex;
+                    align-items: baseline;
+                    justify-content: space-between;
+                    gap: 16px;
+                }
 
-                    .row:not(.sib) .ver,
-                    .sum .ver {
-                        text-align: right;
-                    }
+                .beside .row:not(.sib) > .info > .name,
+                .beside .sum > .info > .name {
+                    overflow-wrap: break-word;
+                }
+
+                .beside .row:not(.sib) > .info > .ver,
+                .beside .sum > .info > .ver {
+                    flex: none;
+                    white-space: nowrap;
+                    text-align: end;
+                }
+
+                /* Measuring: each name at its longest word, never broken inside one, beside its whole version. */
+                .measuring .row:not(.sib) > .info > .name,
+                .measuring .sum > .info > .name {
+                    flex: none;
+                    width: min-content;
+                    overflow-wrap: normal;
                 }
 
                 /* Held to a height, the texts above the list and the line under it keep to one line, cut short with their text as a tooltip. */
@@ -1433,6 +1504,7 @@ export class UpdatesCard extends LitElement {
 
                 /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. A shut one has neither. */
                 .held .list:not(.shut) {
+                    scrollbar-gutter: stable;
                     margin-right: 4px;
                     margin-bottom: 8px;
                 }

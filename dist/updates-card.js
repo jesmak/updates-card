@@ -1335,6 +1335,7 @@ function narrowestWidth(columns) {
   return columns >= 12 ? 288 : columns >= 9 ? 214 : 140;
 }
 var px = (value) => parseFloat(value) || 0;
+var SLACK_PX = 0.01;
 var QUIET_GAP_PX = 6;
 var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
 function endHeight(element) {
@@ -1389,6 +1390,7 @@ var UpdatesCard = class extends i4 {
     this.spare = 0;
     this.sliding = false;
     this.width = 0;
+    this.beside = false;
     this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
     /** Whether the install-all script was running at the last update, whether its run has taken on its rows, and when it last stopped. */
     this.running = false;
@@ -1475,7 +1477,50 @@ var UpdatesCard = class extends i4 {
   }
   measureSoon() {
     cancelAnimationFrame(this.frame ?? 0);
-    this.frame = requestAnimationFrame(() => this.fillRows());
+    this.frame = requestAnimationFrame(() => {
+      this.measureBeside();
+      this.fillRows();
+    });
+  }
+  /**
+   * Puts the waiting rows' and bunches' versions beside their names only when they fit there: when a name's longest word,
+   * the gap and the whole version fit in the row's texts, and no row is taller than with its version under its name. Then
+   * every such row, shut folds' included, so the list keeps one layout. The list is held to its drawn height meanwhile,
+   * its overflow clipped, so nothing around it moves.
+   */
+  measureBeside() {
+    const card = this.renderRoot.querySelector("ha-card");
+    const list = card?.querySelector(":scope > .list");
+    const infos = list ? [...list.querySelectorAll(".row:not(.sib) > .info, .sum > .info")] : [];
+    if (!card || !list?.clientWidth || infos.length === 0) {
+      return;
+    }
+    const heights = () => infos.map((info) => px(getComputedStyle(info).height));
+    const was = card.classList.contains("beside");
+    const content = list.firstElementChild;
+    list.style.height = `${Math.round(px(getComputedStyle(list).height) * 64) / 64}px`;
+    list.style.overflow = "hidden";
+    list.style.overflowAnchor = "none";
+    content?.style.setProperty("min-height", `${Math.round(px(getComputedStyle(content).height) * 64) / 64}px`);
+    card.classList.remove("beside");
+    const under = heights();
+    card.classList.add("beside");
+    const sideBySide = heights();
+    card.classList.add("measuring");
+    const fits = infos.every((info, i7) => {
+      const style = getComputedStyle(info);
+      const parts = [...info.children].reduce((sum, part) => sum + px(getComputedStyle(part).width), 0);
+      return parts + px(style.columnGap) <= px(style.width) + SLACK_PX && sideBySide[i7] <= under[i7] + SLACK_PX;
+    });
+    card.classList.remove("measuring");
+    card.classList.toggle("beside", was);
+    list.style.height = "";
+    list.style.overflow = "";
+    list.style.overflowAnchor = "";
+    content?.style.removeProperty("min-height");
+    if (fits !== this.beside) {
+      this.beside = fits;
+    }
   }
   /**
    * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
@@ -1533,7 +1578,7 @@ var UpdatesCard = class extends i4 {
   }
   /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
   cardClass() {
-    return [this.heightStyle() && "held", this.sliding && "sliding"].filter(Boolean).join(" ");
+    return [this.heightStyle() && "held", this.sliding && "sliding", this.beside && "beside"].filter(Boolean).join(" ");
   }
   /** A fold set sliding: the card fills its rows along with the slide until the slide's end, or a second in case none comes. */
   slide() {
@@ -2513,20 +2558,36 @@ var UpdatesCard = class extends i4 {
                     }
                 }
 
-                /* A wide group has room for a waiting row's versions beside its name. */
-                @container (min-width: 600px) {
-                    .row:not(.sib) .info,
-                    .sum .info {
-                        display: flex;
-                        align-items: baseline;
-                        justify-content: space-between;
-                        gap: 16px;
-                    }
+                /*
+                 * A waiting row's or a bunch's version goes beside its name when every one fits there, as measured, on one
+                 * line. Its name wraps between words only, as its longest word was measured to fit.
+                 */
+                .beside .row:not(.sib) > .info,
+                .beside .sum > .info {
+                    display: flex;
+                    align-items: baseline;
+                    justify-content: space-between;
+                    gap: 16px;
+                }
 
-                    .row:not(.sib) .ver,
-                    .sum .ver {
-                        text-align: right;
-                    }
+                .beside .row:not(.sib) > .info > .name,
+                .beside .sum > .info > .name {
+                    overflow-wrap: break-word;
+                }
+
+                .beside .row:not(.sib) > .info > .ver,
+                .beside .sum > .info > .ver {
+                    flex: none;
+                    white-space: nowrap;
+                    text-align: end;
+                }
+
+                /* Measuring: each name at its longest word, never broken inside one, beside its whole version. */
+                .measuring .row:not(.sib) > .info > .name,
+                .measuring .sum > .info > .name {
+                    flex: none;
+                    width: min-content;
+                    overflow-wrap: normal;
                 }
 
                 /* Held to a height, the texts above the list and the line under it keep to one line, cut short with their text as a tooltip. */
@@ -2542,6 +2603,7 @@ var UpdatesCard = class extends i4 {
 
                 /* Held, the list scrolls, so its scrollbar and its end keep off the card's edges. A shut one has neither. */
                 .held .list:not(.shut) {
+                    scrollbar-gutter: stable;
                     margin-right: 4px;
                     margin-bottom: 8px;
                 }
@@ -2671,6 +2733,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], UpdatesCard.prototype, "width", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "beside", 2);
 UpdatesCard = __decorateClass([
   t3("updates-card")
 ], UpdatesCard);
