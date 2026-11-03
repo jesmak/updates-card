@@ -2687,6 +2687,11 @@ var UpdatesCard = class extends i4 {
                         padding var(--ha-animation-duration-normal, 250ms) ease;
                 }
 
+                /* While nothing waits, the room is the margin above the line of those up to date. */
+                ha-card.sliding > .switch.quiet {
+                    transition: margin var(--ha-animation-duration-normal, 250ms) ease;
+                }
+
                 @media (prefers-reduced-motion: reduce) {
                     .spin {
                         animation: none;
@@ -2694,7 +2699,8 @@ var UpdatesCard = class extends i4 {
 
                     .fold,
                     ha-card.sliding,
-                    ha-card.sliding > .list {
+                    ha-card.sliding > .list,
+                    ha-card.sliding > .switch.quiet {
                         transition: none;
                     }
                 }
