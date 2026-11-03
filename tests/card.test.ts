@@ -358,6 +358,25 @@ describe("updates-card", () => {
         expect(all(element, ".list .row").length > 0).toBe(open);
     });
 
+    it("makes the check under its line large only while the room fits it with its lines", async () => {
+        const element = await quiet({ height: 300 });
+        const idle = one(element, ".idle") as HTMLElement;
+        const lines = one(element, ".idle-lines") as HTMLElement;
+        lines.style.height = "40px";
+        const style = getComputedStyle(idle);
+        const extra = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0) + (parseFloat(style.rowGap) || 0);
+        const large = async (room: number) => {
+            Object.defineProperty(idle, "clientHeight", { value: room + extra, configurable: true });
+            element["measureIdle"]();
+            await element.updateComplete;
+            return one(element, ".idle-icon")!.classList.contains("large");
+        };
+        // 100 px of check, 20 px under it and 40 px of lines
+        expect(await large(160)).toBe(true);
+        expect(await large(159)).toBe(false);
+        expect(await large(200)).toBe(true);
+    });
+
     // A named group with devices has a line of its own. Groups without a name share one line, counting each device once. A
     // card with no named group that has devices gets no line.
     it.each([

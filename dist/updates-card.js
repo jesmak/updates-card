@@ -1308,6 +1308,7 @@ function narrowestWidth(columns) {
 }
 var px = (value) => parseFloat(value) || 0;
 var SLACK_PX = 0.01;
+var LARGE_CHECK_PX = 120;
 var QUIET_GAP_PX = 6;
 var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
 function endHeight(element) {
@@ -1363,6 +1364,7 @@ var UpdatesCard = class extends i4 {
     this.sliding = false;
     this.width = 0;
     this.beside = false;
+    this.largeCheck = false;
     this.resizes = typeof ResizeObserver === "undefined" ? void 0 : new ResizeObserver(() => this.measureSoon());
     /** Whether the install-all script was running at the last update, whether its run has taken on its rows, and when it last stopped. */
     this.running = false;
@@ -1457,8 +1459,27 @@ var UpdatesCard = class extends i4 {
     cancelAnimationFrame(this.frame ?? 0);
     this.frame = requestAnimationFrame(() => {
       this.measureBeside();
+      this.measureIdle();
       this.fillRows();
     });
+  }
+  /**
+   * Held to a set height with nothing waiting, the check under the line is the large one when the room fits it with its
+   * lines, so the room doesn't scroll for it. The room's height comes from the card and the lines' from its width, so
+   * neither changes with the check's size and the choice can't flip back and forth.
+   */
+  measureIdle() {
+    const idle = this.renderRoot.querySelector("ha-card > .idle");
+    const lines = idle?.querySelector(":scope > .idle-lines");
+    if (!idle?.clientHeight || !lines) {
+      return;
+    }
+    const style = getComputedStyle(idle);
+    const room = idle.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
+    const large = LARGE_CHECK_PX + px(style.rowGap) + px(getComputedStyle(lines).height) <= room + SLACK_PX;
+    if (large !== this.largeCheck) {
+      this.largeCheck = large;
+    }
   }
   /**
    * Puts the waiting rows' and bunches' versions beside their names only when they fit there: when a name's longest word,
@@ -1761,7 +1782,7 @@ var UpdatesCard = class extends i4 {
       ...unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: void 0, rows: unnamed }] : []
     ];
     return b2`<div class="idle">
-            <ha-icon class="idle-icon" icon="mdi:check-circle-outline"></ha-icon>
+            <ha-icon class="idle-icon ${this.largeCheck ? "large" : ""}" icon="mdi:check-circle-outline"></ha-icon>
             <div class="idle-lines">
                 ${lines.map(({ name, rows }) => {
       const unreachable = rows.filter((r6) => r6.unreachable).length;
@@ -2616,6 +2637,12 @@ var UpdatesCard = class extends i4 {
                     opacity: 0.5;
                 }
 
+                /* When the room fits it with its lines. Its size and the room under it add up to LARGE_CHECK_PX. */
+                .idle-icon.large {
+                    --mdc-icon-size: 100px;
+                    margin-bottom: 20px;
+                }
+
                 /* The lines are centred as one block, so their icons line up. */
                 .idle-lines {
                     display: flex;
@@ -2712,6 +2739,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], UpdatesCard.prototype, "beside", 2);
+__decorateClass([
+  r5()
+], UpdatesCard.prototype, "largeCheck", 2);
 UpdatesCard = __decorateClass([
   t3("updates-card")
 ], UpdatesCard);

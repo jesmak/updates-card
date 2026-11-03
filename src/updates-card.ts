@@ -82,6 +82,9 @@ const px = (value: string) => parseFloat(value) || 0;
  */
 const SLACK_PX = 0.01;
 
+/** The large check under a held card's one line and the room under it, as in its styles: 100 px and 20 px. */
+const LARGE_CHECK_PX = 120;
+
 /** The gap above the line of those up to date while nothing waits, as the groups have above them while updates wait. */
 const QUIET_GAP_PX = 6;
 
@@ -176,6 +179,8 @@ export class UpdatesCard extends LitElement {
     @state() private width = 0;
     /** As last measured, whether the waiting rows' and bunches' versions fit beside their names. */
     @state() private beside = false;
+    /** As last measured, whether the room under a held card's one line fits the large check with its lines. */
+    @state() private largeCheck = false;
     private timer?: number;
     private slideTimer?: number;
     private frame?: number;
@@ -278,8 +283,28 @@ export class UpdatesCard extends LitElement {
         cancelAnimationFrame(this.frame ?? 0);
         this.frame = requestAnimationFrame(() => {
             this.measureBeside();
+            this.measureIdle();
             this.fillRows();
         });
+    }
+
+    /**
+     * Held to a set height with nothing waiting, the check under the line is the large one when the room fits it with its
+     * lines, so the room doesn't scroll for it. The room's height comes from the card and the lines' from its width, so
+     * neither changes with the check's size and the choice can't flip back and forth.
+     */
+    private measureIdle(): void {
+        const idle = this.renderRoot.querySelector<HTMLElement>("ha-card > .idle");
+        const lines = idle?.querySelector<HTMLElement>(":scope > .idle-lines");
+        if (!idle?.clientHeight || !lines) {
+            return;
+        }
+        const style = getComputedStyle(idle);
+        const room = idle.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
+        const large = LARGE_CHECK_PX + px(style.rowGap) + px(getComputedStyle(lines).height) <= room + SLACK_PX;
+        if (large !== this.largeCheck) {
+            this.largeCheck = large;
+        }
     }
 
     /**
@@ -653,7 +678,7 @@ export class UpdatesCard extends LitElement {
             ...(unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: undefined, rows: unnamed }] : []),
         ];
         return html`<div class="idle">
-            <ha-icon class="idle-icon" icon="mdi:check-circle-outline"></ha-icon>
+            <ha-icon class="idle-icon ${this.largeCheck ? "large" : ""}" icon="mdi:check-circle-outline"></ha-icon>
             <div class="idle-lines">
                 ${lines.map(({ name, rows }) => {
                     const unreachable = rows.filter((r) => r.unreachable).length;
@@ -1549,6 +1574,12 @@ export class UpdatesCard extends LitElement {
                     margin-bottom: 4px;
                     color: var(--success-color, #43a047);
                     opacity: 0.5;
+                }
+
+                /* When the room fits it with its lines. Its size and the room under it add up to LARGE_CHECK_PX. */
+                .idle-icon.large {
+                    --mdc-icon-size: 100px;
+                    margin-bottom: 20px;
                 }
 
                 /* The lines are centred as one block, so their icons line up. */
