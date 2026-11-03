@@ -254,6 +254,26 @@ describe("updates-card", () => {
         expect(await fill()).not.toBe(own);
     });
 
+    it("grows up to a limit on its rows: the rows its content needs under the limit, and the limit on the rows over it", async () => {
+        const element = await quiet({ max_height: 600 }, "grid");
+        const haCard = one(element, "ha-card") as HTMLElement;
+        const box = (target: Element, height: number, width = 300) =>
+            (target.getBoundingClientRect = () => ({ top: 0, bottom: height, height, width }) as DOMRect);
+        Object.defineProperty(haCard, "clientWidth", { value: 300, configurable: true });
+        box(haCard, 56);
+        box(one(element, ".hd")!, 41);
+        box(one(element, ".hd-sub")!, 17);
+        const line = one(element, ".switch.quiet") as HTMLElement;
+        const fill = async (height: number) => {
+            box(line, height);
+            (element as unknown as { fillRows(): void }).fillRows();
+            await element.updateComplete;
+            return haCard.getAttribute("style") ?? "";
+        };
+        expect(await fill(44)).toMatch(/^max-height: 568px; min-height: (56|120|184)px; --uc-spare: \d+px$/);
+        expect(await fill(900)).toBe("max-height: 568px; min-height: 568px; --uc-spare: 0px");
+    });
+
     it.each([
         ["with updates waiting", home(WAITING), CONFIG.groups!],
         ["with no entities", home({ installed: "2026.2.0" }), [{ name: "Nothing", entities: ["update.not_there"] }]],
@@ -427,8 +447,8 @@ describe("updates-card", () => {
         ["a whole section", {}, 4, 189],
         ["twelve columns", { grid_options: { columns: 12 } }, 4, 189],
         ["nine columns, where a row's name and versions take three lines", { grid_options: { columns: 9 } }, 4, 203],
-        ["six columns, where they take four", { grid_options: { columns: 6 } }, 4, 218],
-        ["the older form's two columns of four", { layout_options: { grid_columns: 2 } }, 4, 218],
+        ["six columns, where they take six", { grid_options: { columns: 6 } }, 4, 247],
+        ["the older form's two columns of six", { layout_options: { grid_columns: 2 } }, 4, 247],
         ["a whole section in the older form", { layout_options: { grid_columns: "full" } }, 4, 189],
     ])(
         "asks a sections view on %s for the rows its header, one row and the bottom line need, and is never held lower",
@@ -447,7 +467,7 @@ describe("updates-card", () => {
         ["a maximum height", undefined, { max_height: 300 }, "max-height: 300px"],
         ["a fixed height", undefined, { height_mode: "fixed" as const, height: 240, max_height: 300 }, "height: 240px"],
         ["grid rows in a sections view win over it", "grid", { max_height: 300, grid_options: { rows: 6 } }, "height: 100%"],
-        ["automatic grid rows leave it in force", "grid", { max_height: 300, grid_options: { rows: "auto" } }, "max-height: 300px"],
+        ["automatic grid rows round it down to the rows", "grid", { max_height: 300, grid_options: { rows: "auto" } }, "max-height: 248px"],
         ["neither", undefined, {}, ""],
     ])("sizes itself by %s", async (_name, layout, extra, style) => {
         const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, ...extra }, layout);

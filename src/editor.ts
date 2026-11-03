@@ -1,13 +1,12 @@
 /**
- * The card's visual editor: the title, the groups with what each holds, the action that updates everything, the card's
- * height, and how it rounds its height to the rows of a sections view.
+ * The card's visual editor: the title, the groups with what each holds, the action that updates everything, and how
+ * the card rounds its height to the rows of a sections view. Its height mode is set in YAML only.
  */
 import { LitElement, html, nothing } from "lit";
 import type { TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 
 import type { HomeAssistant } from "./hass";
-import { heightData, heightSchema, tidyHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
 import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import type { UpdatesCardConfig } from "./types";
@@ -46,7 +45,6 @@ function schema(hass: HomeAssistant, config: UpdatesCardConfig, text: (key: stri
             },
         },
         { name: "install_action", selector: { ui_action: { actions: ["perform-action", "navigate", "url"] } } },
-        ...heightSchema(config, text),
         ...rowStepSchema(config, text),
     ];
 }
@@ -67,7 +65,7 @@ export class UpdatesCardEditor extends LitElement {
         return html`
             <ha-form
                 .hass=${this.hass}
-                .data=${rowStepData(heightData(this.config))}
+                .data=${rowStepData(this.config)}
                 .schema=${schema(this.hass, this.config, (key) => this.text(key))}
                 .computeLabel=${(entry: SchemaEntry) => this.text(`editor.${entry.name}`)}
                 .computeHelper=${(entry: SchemaEntry) => this.helper(entry.name)}
@@ -77,7 +75,7 @@ export class UpdatesCardEditor extends LitElement {
     }
 
     private valueChanged(event: CustomEvent<{ value: UpdatesCardConfig }>): void {
-        const config: UpdatesCardConfig = tidyRowStep(tidyHeight(event.detail.value));
+        const config: UpdatesCardConfig = tidyRowStep(event.detail.value);
         // Whatever is emptied is left out, so the configuration stays short.
         const empty = (value: unknown) =>
             value === undefined || value === null || String(value) === "" || (Array.isArray(value) && value.length === 0);

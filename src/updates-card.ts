@@ -18,7 +18,7 @@ import "./editor";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { filledHeight, validRowStep } from "./rows";
+import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
 import type { ActionConfig, Bunch, Group, Row, UpdatesCardConfig } from "./types";
 import { bunchesOf, groupsOf, scriptOf, statusOf } from "./updates";
 import type { Install, Status } from "./updates";
@@ -54,11 +54,16 @@ registry.customCards.push({
  */
 const HELD_FRAME_PX = 44 + 19 + 6 + 29 + 8 + 37 + 2;
 
-/** A waiting row's or a bunch's height on a card this wide or wider, its name and versions wrapping as the width needs. */
+/**
+ * A waiting row's or a bunch's height on a card this wide or wider, its name and versions wrapping as the width needs.
+ * Measured on a bunch of today's ESPHome devices, whose names and versions take one line more at each step down.
+ */
 const FIRST_ROW_PX: [number, number][] = [
     [288, 44],
     [214, 58],
-    [0, 73],
+    [171, 73],
+    [146, 87],
+    [0, 102],
 ];
 
 /**
@@ -323,8 +328,8 @@ export class UpdatesCard extends LitElement {
 
     /**
      * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
-     * with `row_step: half`, so the cards under it stay on the rows. The room left over goes under the status line.
-     * Measured to where the folds' slides end rather than where they are, so the card is on its rows as a slide begins.
+     * with `row_step: half`, so the cards under it stay on the rows, up to the limit of a card that grows up to one. The
+     * room left over goes under the status line. Measured to where the folds' slides end rather than where they are, so the card is on its rows as a slide begins.
      */
     private fillRows(): void {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
@@ -336,7 +341,8 @@ export class UpdatesCard extends LitElement {
         if (width !== this.width) {
             this.width = width;
         }
-        if (this.layout !== "grid" || this.heightStyle()) {
+        const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
+        if (!limit) {
             if (this.filled) this.filled = 0;
             if (this.spare) this.spare = 0;
             return;
@@ -353,7 +359,7 @@ export class UpdatesCard extends LitElement {
             content += px(partStyle.marginTop) + height + px(partStyle.marginBottom);
         }
         content -= this.spareShown(card);
-        const filled = filledHeight(Math.round(content), this.config ?? {});
+        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
         const spare = Math.max(0, Math.floor(filled - content));
         if (filled !== this.filled) {
             this.filled = filled;
@@ -374,13 +380,10 @@ export class UpdatesCard extends LitElement {
         return Math.max(0, below ? parseFloat(getComputedStyle(below).marginTop) || 0 : 0);
     }
 
-    /** The card's inline style: the height it is held to, or the rows it fills, with their spare room under the status line. */
+    /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room under the status line. */
     private cardStyle(): string {
-        const held = this.heightStyle();
-        if (held || !this.filled) {
-            return held;
-        }
-        return `min-height: ${this.filled}px; --uc-spare: ${this.spare}px`;
+        const style = filledStyle(this.config ?? {}, this.layout, this.minimumHeight(), this.filled);
+        return this.filled ? `${style}; --uc-spare: ${this.spare}px` : style;
     }
 
     /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
