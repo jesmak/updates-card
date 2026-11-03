@@ -405,7 +405,14 @@ export class UpdatesCard extends LitElement {
 
     private readonly slid = (event: TransitionEvent): void => {
         const target = event.target as HTMLElement;
-        if (event.propertyName === "grid-template-rows" && target.classList?.contains("fold")) {
+        if (event.propertyName !== "grid-template-rows" || !target.classList?.contains("fold")) {
+            return;
+        }
+        // Another fold may still be sliding, as one reversed halfway ends before the one opening beside it.
+        const moving = [...this.renderRoot.querySelectorAll(".fold")].some(
+            (fold) => fold !== target && (fold.getAnimations?.().length ?? 0) > 0,
+        );
+        if (!moving) {
             window.clearTimeout(this.slideTimer);
             this.sliding = false;
         }

@@ -1377,7 +1377,13 @@ var UpdatesCard = class extends i4 {
     };
     this.slid = (event) => {
       const target = event.target;
-      if (event.propertyName === "grid-template-rows" && target.classList?.contains("fold")) {
+      if (event.propertyName !== "grid-template-rows" || !target.classList?.contains("fold")) {
+        return;
+      }
+      const moving = [...this.renderRoot.querySelectorAll(".fold")].some(
+        (fold) => fold !== target && (fold.getAnimations?.().length ?? 0) > 0
+      );
+      if (!moving) {
         window.clearTimeout(this.slideTimer);
         this.sliding = false;
       }

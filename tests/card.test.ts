@@ -140,6 +140,28 @@ describe("updates-card", () => {
         expect(text(one(element, ".action"))).toBe("Update all");
     });
 
+    it("keeps sliding while another fold still slides, and lets go once the last one ends", async () => {
+        const element = await card(home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" }));
+        const sliding = () => element.shadowRoot!.querySelector("ha-card")!.classList.contains("sliding");
+        const end = (fold: HTMLElement) => {
+            const event = new Event("transitionend", { bubbles: true, composed: true }) as TransitionEvent;
+            Object.defineProperty(event, "propertyName", { value: "grid-template-rows" });
+            fold.dispatchEvent(event);
+        };
+        (all(element, ".sum")[0] as HTMLButtonElement).click();
+        (all(element, ".sum")[1] as HTMLButtonElement).click();
+        await element.updateComplete;
+        const [first, other] = element.shadowRoot!.querySelectorAll<HTMLElement>(".fold");
+        other!.getAnimations = () => [{}] as Animation[];
+        end(first!);
+        await element.updateComplete;
+        expect(sliding()).toBe(true);
+        other!.getAnimations = () => [];
+        end(other!);
+        await element.updateComplete;
+        expect(sliding()).toBe(false);
+    });
+
     it("installs one row at a time, and calls update.install for that row alone", async () => {
         const hass = fakeHass([
             { id: "update.a", state: "on", latest: "2.0.0", friendly_name: "Alpha" },
