@@ -2,7 +2,7 @@
 
 Home Assistant dashboard card for update entities, in groups, folded away under one line when nothing is waiting.
 
-[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![HACS][hacs-shield]][hacs] [![License][license-shield]](LICENSE)
+[![GitHub Release][releases-shield]][releases] [![GitHub Release Date][release-date-shield]][releases] [![Marketplace][marketplace-shield]][marketplace] [![License][license-shield]](LICENSE)
 
 <p>
 <img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/waiting-light.png#gh-light-mode-only" width="400" alt="ESPHome devices in two groups, a house and a garden. Five devices of the house fold into one row going from 2026.9.1 to 2026.10.0, the garden lists two devices with their own buttons and one unreachable">
@@ -28,10 +28,10 @@ it, and offers to stop it.
 
 ## Installation
 
-### With HACS
+### With the Marketplace
 
-1. Add this repository to HACS custom repositories with type **Dashboard**
-2. Search for Updates card in HACS and download it
+1. Open Settings › Marketplace, choose Add from link and paste `https://github.com/jesmak/updates-card`
+2. Open Updates card in the Marketplace and choose Install
 3. Refresh your browser
 
 ### Manual
@@ -188,7 +188,7 @@ npm run check
 ```
 
 `npm run check` typechecks, lints, checks formatting, runs the tests and builds `dist/updates-card.js`, which is the
-file HACS installs and is committed to the repository.
+file the Marketplace installs and is committed to the repository.
 
 | Path                      | What it contains                                                                    |
 | ------------------------- | ----------------------------------------------------------------------------------- |
@@ -215,6 +215,6 @@ MIT, see [LICENSE](LICENSE).
 [releases-shield]: https://img.shields.io/github/release/jesmak/updates-card.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/updates-card?style=for-the-badge
 [releases]: https://github.com/jesmak/updates-card/releases
-[hacs-shield]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
-[hacs]: https://hacs.xyz/docs/faq/custom_repositories/
+[marketplace-shield]: https://img.shields.io/badge/Marketplace-Custom-orange.svg?style=for-the-badge
+[marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=updates-card&category=plugin
 [license-shield]: https://img.shields.io/github/license/jesmak/updates-card.svg?style=for-the-badge
