@@ -29,6 +29,7 @@ export interface Device {
     name: string;
     name_by_user?: string;
     area?: string;
+    service?: boolean;
 }
 
 /** A Home Assistant with the given update entities, devices and other entities, and a callService that records its calls. */
@@ -70,7 +71,16 @@ export function fakeHass(updates: Fake[], devices: Device[] = [], siblings: Sibl
         states,
         entities,
         devices: Object.fromEntries(
-            devices.map((d) => [d.id, { id: d.id, name: d.name, name_by_user: d.name_by_user ?? null, area_id: d.area ?? null }]),
+            devices.map((d) => [
+                d.id,
+                {
+                    id: d.id,
+                    name: d.name,
+                    name_by_user: d.name_by_user ?? null,
+                    area_id: d.area ?? null,
+                    entry_type: d.service ? "service" : null,
+                },
+            ]),
         ),
         areas: { garage: { area_id: "garage", name: "Garage" }, cabin: { area_id: "cabin", name: "Cabin" } },
         locale: { language: "en" },

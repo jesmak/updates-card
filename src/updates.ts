@@ -94,6 +94,9 @@ export function deviceCounts(hass: HomeAssistant): Map<string, DeviceCounts> {
  * An update entity as a row. A device's update entity is named after its device, as the entity's own name adds only
  * "Firmware" to it, unless the device has several update entities, which the device's name wouldn't tell apart.
  *
+ * Without a title, the software is the integration's, as for the firmware of Zigbee2MQTT's devices, unless the device
+ * is a service, which is software of its own. The Marketplace gives its downloads no title.
+ *
  * A row is out of reach when its entity is unavailable, or when every other entity of its device is down. ESPHome keeps
  * the update entity available after a disconnect the device announced, such as going to sleep, and so may other
  * integrations.
@@ -107,10 +110,11 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
     const entry = hass.entities?.[entityId];
     const device = entry?.device_id ? hass.devices?.[entry.device_id] : undefined;
     const count = entry?.device_id ? counts.get(entry.device_id) : undefined;
-    const ownName = String(attributes.friendly_name ?? entityId);
+    const ownName =
+        hass.formatEntityName?.(state, [{ type: "device" }, { type: "entity" }]) || String(attributes.friendly_name ?? entityId);
     const name = device && (count?.updates ?? 1) <= 1 ? device.name_by_user || device.name || ownName : ownName;
     const title = typeof attributes.title === "string" && attributes.title ? attributes.title : undefined;
-    const software = title ?? entry?.platform ?? ownName;
+    const software = title ?? (device?.entry_type === "service" ? name : (entry?.platform ?? ownName));
     const others = count ? count.states - 1 : 0;
     const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
     const unreachable = state.state === "unavailable" || (others > 0 && othersDown === others);

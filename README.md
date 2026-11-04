@@ -7,13 +7,13 @@ Home Assistant dashboard card for update entities, in groups, folded away under 
 <p>
 <img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/waiting-light.png#gh-light-mode-only" width="400" alt="ESPHome devices in two groups, a house and a garden. Five devices of the house fold into one row going from 2026.9.1 to 2026.10.0, the garden lists two devices with their own buttons and one unreachable">
 <img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/waiting-dark.png#gh-dark-mode-only" width="400" alt="ESPHome devices in two groups, a house and a garden. Five devices of the house fold into one row going from 2026.9.1 to 2026.10.0, the garden lists two devices with their own buttons and one unreachable">
-<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/mixed-light.png#gh-light-mode-only" width="400" alt="Updates of Home Assistant Core, two HACS cards and a router, each in a group of its own, the router without an install button">
-<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/mixed-dark.png#gh-dark-mode-only" width="400" alt="Updates of Home Assistant Core, two HACS cards and a router, each in a group of its own, the router without an install button">
+<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/mixed-light.png#gh-light-mode-only" width="400" alt="Updates of Home Assistant Core, two Marketplace cards and a router in three groups, the router without an install button">
+<img src="https://raw.githubusercontent.com/jesmak/updates-card/main/docs/images/mixed-dark.png#gh-dark-mode-only" width="400" alt="Updates of Home Assistant Core, two Marketplace cards and a router in three groups, the router without an install button">
 </p>
 
 ## What is it?
 
-A card for Home Assistant's `update` entities, such as the firmware of ESPHome, Zigbee or WLED devices, HACS downloads,
+A card for Home Assistant's `update` entities, such as the firmware of ESPHome, Zigbee or WLED devices, Marketplace downloads,
 Home Assistant itself, or anything else that has an update entity. It shows them in groups you choose, by integration, by area or
 by a list of entities.
 
@@ -63,7 +63,7 @@ A group holds the update entities of an integration, in some areas or outside th
 | Name            | Type   | Description                                                                        |
 | --------------- | ------ | ---------------------------------------------------------------------------------- |
 | `name`          | string | Shown above the group. Without one, the group has no heading                       |
-| `integration`   | string | Only update entities of this integration, such as `esphome` or `hacs`              |
+| `integration`   | string | Only update entities of this integration, such as `esphome` or `marketplace`       |
 | `areas`         | list   | Only update entities in these areas, by the entity's own area or else its device's |
 | `exclude_areas` | list   | No update entities from these areas                                                |
 | `entities`      | list   | Exactly these update entities, instead of the integration and areas                |
@@ -82,9 +82,10 @@ its **Show** opens every update entity, muted, by group, with its version.
 **Updates waiting.** Each group shows the rows with an update, with the version installed and the one available. A
 line at the bottom opens the rest. Three or more rows of a group that update the same software to the same version
 fold into one row, named after the software, which opens to all of them. The same software means the same integration
-and the same title, which an update entity gives for the software it updates. Every ESPHome device's says "ESPHome",
-while each HACS download has its own name, so two HACS cards never fold together. The card compares versions only as
-text and never reads them as numbers, so any kind of versioning works.
+and the same title, which an update entity gives for the software it updates. Every ESPHome device's says "ESPHome".
+An entity without a title updates its integration's software, unless its device is a service, as each Marketplace
+download is, which is software of its own. So two Marketplace cards never fold together. The card compares versions
+only as text and never reads them as numbers, so any kind of versioning works.
 
 **Installing a row.** The row's button calls `update.install` for that entity alone. While it installs, the other
 buttons wait, so two installs never run at once from the card. A device reboots after its firmware is written, so the
@@ -150,7 +151,7 @@ install_action:
 max_height: 600
 ```
 
-### Everything Home Assistant itself and HACS update
+### Everything Home Assistant itself and the Marketplace update
 
 ```yaml
 type: custom:updates-card
@@ -158,8 +159,8 @@ title: Updates
 groups:
   - name: Home Assistant
     integration: hassio
-  - name: HACS
-    integration: hacs
+  - name: Marketplace
+    integration: marketplace
 ```
 
 ### A few entities by hand

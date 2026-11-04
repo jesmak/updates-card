@@ -1104,10 +1104,10 @@ function rowOf(hass, entityId, counts) {
   const entry = hass.entities?.[entityId];
   const device = entry?.device_id ? hass.devices?.[entry.device_id] : void 0;
   const count = entry?.device_id ? counts.get(entry.device_id) : void 0;
-  const ownName = String(attributes.friendly_name ?? entityId);
+  const ownName = hass.formatEntityName?.(state, [{ type: "device" }, { type: "entity" }]) || String(attributes.friendly_name ?? entityId);
   const name = device && (count?.updates ?? 1) <= 1 ? device.name_by_user || device.name || ownName : ownName;
   const title = typeof attributes.title === "string" && attributes.title ? attributes.title : void 0;
-  const software = title ?? entry?.platform ?? ownName;
+  const software = title ?? (device?.entry_type === "service" ? name : entry?.platform ?? ownName);
   const others = count ? count.states - 1 : 0;
   const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
   const unreachable = state.state === "unavailable" || others > 0 && othersDown === others;

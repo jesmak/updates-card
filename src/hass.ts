@@ -21,11 +21,18 @@ export interface HassDevice {
     name: string | null;
     name_by_user: string | null;
     area_id: string | null;
+    /** "service" for software rather than hardware, such as a download from the Marketplace. */
+    entry_type?: "service" | null;
 }
 
 export interface HassArea {
     area_id: string;
     name: string;
+}
+
+/** One part of an entity's name, as `formatEntityName` puts them together. */
+export interface NamePart {
+    type: "entity" | "device" | "area" | "floor";
 }
 
 export interface HomeAssistant {
@@ -41,6 +48,8 @@ export interface HomeAssistant {
         data?: Record<string, unknown>,
         target?: { entity_id: string | string[] },
     ): Promise<unknown>;
+    /** Present in Home Assistant 2025.11 and later. */
+    formatEntityName?(state: HassEntity, parts: NamePart[]): string;
 }
 
 export interface LovelaceCardConfig {

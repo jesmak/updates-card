@@ -13,7 +13,7 @@ describe("groupEntities", () => {
             { id: "update.garage_sensor", device: "d2" },
             { id: "update.cabin_plug", device: "d3" },
             { id: "update.own_area", device: "d3", area: "garage" },
-            { id: "update.mushroom", platform: "hacs" },
+            { id: "update.mushroom", platform: "marketplace" },
             { id: "update.hidden", hidden: true },
         ],
         [
@@ -30,7 +30,7 @@ describe("groupEntities", () => {
             {},
             ["update.cabin_plug", "update.garage_sensor", "update.kitchen_plug", "update.mushroom", "update.own_area"],
         ],
-        ["by integration", { integration: "hacs" }, ["update.mushroom"]],
+        ["by integration", { integration: "marketplace" }, ["update.mushroom"]],
         ["by area, the entity's own before its device's", { areas: ["garage"] }, ["update.garage_sensor", "update.own_area"]],
         [
             "excluding areas keeps entities without one",
@@ -61,7 +61,10 @@ describe("rowOf", () => {
             { id: "update.away", device: "d3", state: "unavailable" },
             { id: "update.asleep", device: "d4", state: "on", latest: "2.0.0" },
             { id: "update.lonely", device: "d5", state: "on", latest: "2.0.0" },
-            { id: "update.card", platform: "hacs", title: null, features: 0, in_progress: 40 },
+            { id: "update.card", device: "d13", platform: "mqtt", title: null, features: 0, in_progress: 40 },
+            { id: "update.share", device: "d14", platform: "hassio", title: "Samba share" },
+            { id: "update.mushroom", device: "d11", platform: "marketplace", title: null, state: "on", latest: "v2" },
+            { id: "update.card_mod", device: "d12", platform: "marketplace", title: null, state: "on", latest: "v2" },
             { id: "update.dozing", device: "d6", state: "on", latest: "2.0.0" },
             { id: "update.panel", device: "d7", state: "on", latest: "2.0.0" },
             { id: "update.bridge", device: "d8", state: "on", latest: "2.0.0" },
@@ -79,6 +82,10 @@ describe("rowOf", () => {
             { id: "d8", name: "Bridge" },
             { id: "d9", name: "Button" },
             { id: "d10", name: "Linked sensor" },
+            { id: "d11", name: "Mushroom", service: true },
+            { id: "d12", name: "card-mod", service: true },
+            { id: "d13", name: "Wall socket" },
+            { id: "d14", name: "Samba share add-on", service: true },
         ],
         [
             // A connection sensor, as ESPHome's status sensor, stays available and turns off when its device is gone.
@@ -113,6 +120,17 @@ describe("rowOf", () => {
         expect([row("update.twin_a").name, row("update.twin_b").name]).toEqual(["Hub firmware", "Hub radio firmware"]);
     });
 
+    it("takes the entity's own name from formatEntityName where the frontend has it, and friendly_name where it gives none", () => {
+        const named = {
+            ...hass,
+            formatEntityName: (state: { entity_id: string }) => (state.entity_id === "update.twin_a" ? "hub Firmware" : ""),
+        };
+        expect([rowOf(named, "update.twin_a", counts)!.name, rowOf(named, "update.twin_b", counts)!.name]).toEqual([
+            "hub Firmware",
+            "Hub radio firmware",
+        ]);
+    });
+
     it.each([
         ["its entity is unavailable", true, "update.away"],
         ["every other entity of its device is unavailable, though the update entity waits", true, "update.dozing"],
@@ -131,8 +149,18 @@ describe("rowOf", () => {
         }
     });
 
-    it("names the software by its integration without a title, and reads a progress percentage as installing", () => {
-        expect(row("update.card")).toMatchObject({ software: "hacs", canInstall: false, installing: true });
+    it("names the software by its title on a service too", () => {
+        expect(row("update.share").software).toBe("Samba share");
+    });
+
+    it("names the software by its integration without a title on a device that isn't a service, and reads a progress percentage as installing", () => {
+        expect(row("update.card")).toMatchObject({ software: "mqtt", canInstall: false, installing: true });
+    });
+
+    it("names the software after the row on a service without a title, so two downloads to the same version stay apart", () => {
+        const [mushroom, cardMod] = [row("update.mushroom"), row("update.card_mod")];
+        expect([mushroom.software, cardMod.software]).toEqual(["Mushroom", "card-mod"]);
+        expect(mushroom.softwareKey).not.toBe(cardMod.softwareKey);
     });
 });
 
@@ -168,7 +196,11 @@ describe("bunchesOf", () => {
         ["two stay single", [make("a", "WLED", "1", "2"), make("b", "WLED", "1", "2")], [], ["a", "b"], undefined],
         [
             "different software to the same version never bunches",
-            [make("a", "Mushroom", "v1", "v2", "hacs"), make("b", "card-mod", "v1", "v2", "hacs"), make("c", "Bambu", "v1", "v2", "hacs")],
+            [
+                make("a", "Mushroom", "v1", "v2", "marketplace"),
+                make("b", "card-mod", "v1", "v2", "marketplace"),
+                make("c", "Bambu", "v1", "v2", "marketplace"),
+            ],
             [],
             ["a", "b", "c"],
             undefined,

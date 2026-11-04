@@ -179,6 +179,11 @@ describe("updates-card", () => {
         expect(text(one(element, ".pill.running"))).toBe("Updating");
         expect((all(element, ".install")[0] as HTMLButtonElement).disabled).toBe(true);
         expect(text(one(element, ".hd-sub"))).toBe("Updating Alpha");
+        const beta = all(element, ".install").find((b) => b.getAttribute("aria-label")?.includes("Beta")) as HTMLButtonElement;
+        expect(beta.disabled).toBe(true);
+        beta.click();
+        await element.updateComplete;
+        expect(hass.calls).toHaveLength(1);
         finish();
     });
 

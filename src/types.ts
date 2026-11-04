@@ -38,7 +38,7 @@ export interface UpdatesCardConfig extends LovelaceCardConfig, RowStepConfig {
 export interface Row {
     entity_id: string;
     name: string;
-    /** The software being updated (the entity's `title`), or its integration when it has none. */
+    /** The software being updated: the entity's `title`, else the row's name on a service, else its integration. */
     software: string;
     /** The integration and the software together, which a bunch's rows share. */
     softwareKey: string;
