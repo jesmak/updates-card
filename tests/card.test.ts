@@ -406,6 +406,21 @@ describe("updates-card", () => {
         expect(await large(200)).toBe(true);
     });
 
+    it("makes the check under its line large at once while the list still slides shut, by the room it will have", async () => {
+        const element = await quiet({ height: 300 });
+        const idle = one(element, ".idle") as HTMLElement;
+        (one(element, ".idle-lines") as HTMLElement).style.height = "40px";
+        Object.defineProperty(idle, "clientHeight", { value: 0, configurable: true });
+        // The shut list and its fold still drawn 200 px tall, which all goes to the room once the fold has slid shut.
+        const drawn = () => ({ height: 200, top: 0, bottom: 200 }) as DOMRect;
+        const list = one(element, ".list") as HTMLElement;
+        list.getBoundingClientRect = drawn;
+        list.querySelector<HTMLElement>(":scope > .fold")!.getBoundingClientRect = drawn;
+        element["measureIdle"]();
+        await element.updateComplete;
+        expect(one(element, ".idle-icon")!.classList.contains("large")).toBe(true);
+    });
+
     // A named group with devices has a line of its own. Groups without a name share one line, counting each device once. A
     // card with no named group that has devices gets no line.
     it.each([

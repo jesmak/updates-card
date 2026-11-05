@@ -1475,16 +1475,23 @@ var UpdatesCard = class extends i4 {
   /**
    * Held to a set height with nothing waiting, the check under the line is the large one when the room fits it with its
    * lines, so the room doesn't scroll for it. The room's height comes from the card and the lines' from its width, so
-   * neither changes with the check's size and the choice can't flip back and forth. Returns false when the layout changed.
+   * neither changes with the check's size and the choice can't flip back and forth. The room is measured as it will be once
+   * the list has slid shut, so the check doesn't start small while the list still takes the room and grow at the slide's
+   * end. Returns false when the layout changed.
    */
   measureIdle() {
-    const idle = this.renderRoot.querySelector("ha-card > .idle");
+    const card = this.renderRoot.querySelector("ha-card");
+    const idle = card?.querySelector(":scope > .idle");
     const lines = idle?.querySelector(":scope > .idle-lines");
-    if (!idle?.clientHeight || !lines) {
+    const list = card?.querySelector(":scope > .list");
+    const listHeight = list?.getBoundingClientRect().height ?? 0;
+    if (!card || !idle || !lines || !idle.clientHeight && !listHeight) {
       return true;
     }
+    const scale = drawnScale(card);
+    const sliding = list ? Math.max(0, listHeight / scale - endHeight(list, scale)) : 0;
     const style = getComputedStyle(idle);
-    const room = idle.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
+    const room = idle.clientHeight + sliding - px(style.paddingTop) - px(style.paddingBottom);
     const large = LARGE_CHECK_PX + px(style.rowGap) + px(getComputedStyle(lines).height) <= room + SLACK_PX2;
     if (large === this.largeCheck) return true;
     this.largeCheck = large;
