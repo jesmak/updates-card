@@ -48,7 +48,7 @@ export interface HomeAssistant {
         data?: Record<string, unknown>,
         target?: { entity_id: string | string[] },
     ): Promise<unknown>;
-    /** Present in Home Assistant 2025.11 and later. */
+    /** Present in Home Assistant 2025.10 and later. */
     formatEntityName?(state: HassEntity, parts: NamePart[]): string;
 }
 

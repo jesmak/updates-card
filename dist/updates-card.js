@@ -1,4 +1,4 @@
-/*! updates-card 1.1.0 | MIT License */
+/*! updates-card 1.1.1 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.1.0";
+var CARD_VERSION = "1.1.1";
 var FEATURE_INSTALL = 1;
 var BUNCH_MIN = 3;
 var DONE_KEEP = 5 * 6e4;
@@ -1458,41 +1458,41 @@ var UpdatesCard = class extends i4 {
   measureSoon() {
     cancelAnimationFrame(this.frame ?? 0);
     this.frame = requestAnimationFrame(() => {
-      this.measureBeside();
-      this.measureIdle();
-      this.fillRows();
+      if (this.measureBeside() && this.measureIdle()) {
+        this.fillRows();
+      }
     });
   }
   /**
    * Held to a set height with nothing waiting, the check under the line is the large one when the room fits it with its
    * lines, so the room doesn't scroll for it. The room's height comes from the card and the lines' from its width, so
-   * neither changes with the check's size and the choice can't flip back and forth.
+   * neither changes with the check's size and the choice can't flip back and forth. Returns false when the layout changed.
    */
   measureIdle() {
     const idle = this.renderRoot.querySelector("ha-card > .idle");
     const lines = idle?.querySelector(":scope > .idle-lines");
     if (!idle?.clientHeight || !lines) {
-      return;
+      return true;
     }
     const style = getComputedStyle(idle);
     const room = idle.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
     const large = LARGE_CHECK_PX + px(style.rowGap) + px(getComputedStyle(lines).height) <= room + SLACK_PX;
-    if (large !== this.largeCheck) {
-      this.largeCheck = large;
-    }
+    if (large === this.largeCheck) return true;
+    this.largeCheck = large;
+    return false;
   }
   /**
    * Puts the waiting rows' and bunches' versions beside their names only when they fit there: when a name's longest word,
    * the gap and the whole version fit in the row's texts, and no row is taller than with its version under its name. Then
    * every such row, shut folds' included, so the list keeps one layout. The list is held to its drawn height meanwhile,
-   * its overflow clipped, so nothing around it moves.
+   * its overflow clipped, so nothing around it moves. Returns false when the layout changed.
    */
   measureBeside() {
     const card = this.renderRoot.querySelector("ha-card");
     const list = card?.querySelector(":scope > .list");
     const infos = list ? [...list.querySelectorAll(".row:not(.sib) > .info, .sum > .info")] : [];
     if (!card || !list?.clientWidth || infos.length === 0) {
-      return;
+      return true;
     }
     const heights = () => infos.map((info) => px(getComputedStyle(info).height));
     const was = card.classList.contains("beside");
@@ -1517,9 +1517,9 @@ var UpdatesCard = class extends i4 {
     list.style.overflow = "";
     list.style.overflowAnchor = "";
     content?.style.removeProperty("min-height");
-    if (fits !== this.beside) {
-      this.beside = fits;
-    }
+    if (fits === this.beside) return true;
+    this.beside = fits;
+    return false;
   }
   /**
    * In a sections view whose rows are left automatic, the card takes the whole rows its content needs, or the half rows
@@ -2085,6 +2085,8 @@ var UpdatesCard = class extends i4 {
       i`
                 /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
                 ha-card {
+                    /* ha-card's own transition covers every property, so a change in the rows filled would animate. Only a slide does. */
+                    transition: none;
                     box-sizing: border-box;
                     display: flex;
                     flex-direction: column;

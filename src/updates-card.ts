@@ -282,43 +282,45 @@ export class UpdatesCard extends LitElement {
     private measureSoon(): void {
         cancelAnimationFrame(this.frame ?? 0);
         this.frame = requestAnimationFrame(() => {
-            this.measureBeside();
-            this.measureIdle();
-            this.fillRows();
+            // A layout that changes is drawn on the next render, which measures again. Rows filled to the one still drawn
+            // would hold the card at a wrong height for a frame.
+            if (this.measureBeside() && this.measureIdle()) {
+                this.fillRows();
+            }
         });
     }
 
     /**
      * Held to a set height with nothing waiting, the check under the line is the large one when the room fits it with its
      * lines, so the room doesn't scroll for it. The room's height comes from the card and the lines' from its width, so
-     * neither changes with the check's size and the choice can't flip back and forth.
+     * neither changes with the check's size and the choice can't flip back and forth. Returns false when the layout changed.
      */
-    private measureIdle(): void {
+    private measureIdle(): boolean {
         const idle = this.renderRoot.querySelector<HTMLElement>("ha-card > .idle");
         const lines = idle?.querySelector<HTMLElement>(":scope > .idle-lines");
         if (!idle?.clientHeight || !lines) {
-            return;
+            return true;
         }
         const style = getComputedStyle(idle);
         const room = idle.clientHeight - px(style.paddingTop) - px(style.paddingBottom);
         const large = LARGE_CHECK_PX + px(style.rowGap) + px(getComputedStyle(lines).height) <= room + SLACK_PX;
-        if (large !== this.largeCheck) {
-            this.largeCheck = large;
-        }
+        if (large === this.largeCheck) return true;
+        this.largeCheck = large;
+        return false;
     }
 
     /**
      * Puts the waiting rows' and bunches' versions beside their names only when they fit there: when a name's longest word,
      * the gap and the whole version fit in the row's texts, and no row is taller than with its version under its name. Then
      * every such row, shut folds' included, so the list keeps one layout. The list is held to its drawn height meanwhile,
-     * its overflow clipped, so nothing around it moves.
+     * its overflow clipped, so nothing around it moves. Returns false when the layout changed.
      */
-    private measureBeside(): void {
+    private measureBeside(): boolean {
         const card = this.renderRoot.querySelector<HTMLElement>("ha-card");
         const list = card?.querySelector<HTMLElement>(":scope > .list");
         const infos = list ? [...list.querySelectorAll<HTMLElement>(".row:not(.sib) > .info, .sum > .info")] : [];
         if (!card || !list?.clientWidth || infos.length === 0) {
-            return;
+            return true;
         }
         const heights = (): number[] => infos.map((info) => px(getComputedStyle(info).height));
         const was = card.classList.contains("beside");
@@ -346,9 +348,9 @@ export class UpdatesCard extends LitElement {
         list.style.overflow = "";
         list.style.overflowAnchor = "";
         content?.style.removeProperty("min-height");
-        if (fits !== this.beside) {
-            this.beside = fits;
-        }
+        if (fits === this.beside) return true;
+        this.beside = fits;
+        return false;
     }
 
     /**
@@ -1024,6 +1026,8 @@ export class UpdatesCard extends LitElement {
             css`
                 /* A column, so that with a height of its own the header and the bottom line stay put and the list scrolls. */
                 ha-card {
+                    /* ha-card's own transition covers every property, so a change in the rows filled would animate. Only a slide does. */
+                    transition: none;
                     box-sizing: border-box;
                     display: flex;
                     flex-direction: column;
