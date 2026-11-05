@@ -30,8 +30,8 @@ it, and offers to stop it.
 
 ### With the Marketplace
 
-1. Open Settings › Marketplace, choose Add from link and paste `https://github.com/jesmak/updates-card`
-2. Open Updates card in the Marketplace and choose Install
+1. Open Settings › Marketplace and search for Updates card
+2. Open it and choose Install
 3. Refresh your browser
 
 ### Manual
@@ -215,6 +215,6 @@ MIT, see [LICENSE](LICENSE).
 [releases-shield]: https://img.shields.io/github/release/jesmak/updates-card.svg?style=for-the-badge
 [release-date-shield]: https://img.shields.io/github/release-date/jesmak/updates-card?style=for-the-badge
 [releases]: https://github.com/jesmak/updates-card/releases
-[marketplace-shield]: https://img.shields.io/badge/Marketplace-Custom-orange.svg?style=for-the-badge
+[marketplace-shield]: https://img.shields.io/badge/Marketplace-Default-green.svg?style=for-the-badge
 [marketplace]: https://my.home-assistant.io/redirect/marketplace_repository/?owner=jesmak&repository=updates-card&category=plugin
 [license-shield]: https://img.shields.io/github/license/jesmak/updates-card.svg?style=for-the-badge
