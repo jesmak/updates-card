@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HomeAssistant } from "../src/hass";
 import { browserLanguage, translate } from "../src/localize/localize";
@@ -279,6 +279,30 @@ describe("updates-card", () => {
         expect(await fill()).toBe(own);
         box(line, 248);
         expect(await fill()).not.toBe(own);
+    });
+
+    // The parts add up to 120.4 px, a fraction over two rows, and then to 216 px drawn at 0.8, as a dialog opening draws it.
+    it.each([
+        ["a fraction of a pixel over a row, on the next one", 62.4, 1, "min-height: 184px; --uc-spare: 63px"],
+        ["drawn scaled, in the layout's pixels", 158, 0.8, "min-height: 248px; --uc-spare: 32px"],
+    ])("fills its rows %s", async (_name, quietLine, scale, style) => {
+        const element = await quiet({}, "grid");
+        const haCard = one(element, "ha-card") as HTMLElement;
+        const box = (target: Element, height: number, width = 300) =>
+            (target.getBoundingClientRect = () =>
+                ({ top: 0, bottom: height * scale, height: height * scale, width: width * scale }) as DOMRect);
+        Object.defineProperty(haCard, "clientWidth", { value: 300, configurable: true });
+        box(haCard, 56);
+        box(one(element, ".hd")!, 41);
+        box(one(element, ".hd-sub")!, 17);
+        box(one(element, ".switch.quiet")!, quietLine);
+        vi.spyOn(window, "getComputedStyle").mockImplementation(
+            (target) => ({ width: target === haCard ? "300px" : "0px", display: "block", order: "0" }) as unknown as CSSStyleDeclaration,
+        );
+        (element as unknown as { fillRows(): void }).fillRows();
+        vi.restoreAllMocks();
+        await element.updateComplete;
+        expect(haCard.getAttribute("style")).toBe(style);
     });
 
     it("grows up to a limit on its rows: the rows its content needs under the limit, and the limit on the rows over it", async () => {

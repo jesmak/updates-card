@@ -18,7 +18,7 @@ import "./editor";
 import type { HomeAssistant } from "./hass";
 import { gridMinRows, heightCardSize, heightStyle, validHeight } from "./height";
 import { browserLanguage, translate } from "./localize/localize";
-import { fillLimit, filledHeight, filledStyle, validRowStep } from "./rows";
+import { drawnScale, fillLimit, filledHeight, filledStyle, spareRoom, validRowStep } from "./rows";
 import type { ActionConfig, Bunch, Group, Row, UpdatesCardConfig } from "./types";
 import { bunchesOf, groupsOf, scriptOf, statusOf } from "./updates";
 import type { Install, Status } from "./updates";
@@ -95,24 +95,25 @@ const CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".message", ".
  * An element's height once every fold in it has slid open or shut, so the card is on its rows as a slide begins. A shut
  * fold ends at nothing. An open one ends at its content's height, measured from where its last part ends, as its box is
  * clipped while it slides. Parts follow one another, or with the groups side by side, each row of them is as tall as its
- * tallest.
+ * tallest. Drawn sizes are divided by the card's drawn `scale`, as the paddings and margins added to them are the layout's.
  */
-export function endHeight(element: HTMLElement): number {
+export function endHeight(element: HTMLElement, scale = 1): number {
     if (element.classList.contains("fold")) {
         const inner = element.firstElementChild as HTMLElement | null;
         const last = inner?.lastElementChild as HTMLElement | null;
         if (!element.classList.contains("open") || !inner || !last) {
             return 0;
         }
-        const natural = last.getBoundingClientRect().bottom + px(getComputedStyle(last).marginBottom) - inner.getBoundingClientRect().top;
-        return natural + childChange(inner);
+        const natural =
+            (last.getBoundingClientRect().bottom - inner.getBoundingClientRect().top) / scale + px(getComputedStyle(last).marginBottom);
+        return natural + childChange(inner, scale);
     }
     if (!element.querySelector(".fold")) {
-        return element.getBoundingClientRect().height;
+        return element.getBoundingClientRect().height / scale;
     }
     const style = getComputedStyle(element);
     if (style.display !== "grid") {
-        return element.getBoundingClientRect().height + childChange(element);
+        return element.getBoundingClientRect().height / scale + childChange(element, scale);
     }
     const columns = style.gridTemplateColumns.split(" ").length;
     const placed = [...element.children]
@@ -121,16 +122,16 @@ export function endHeight(element: HTMLElement): number {
         .map(({ child }) => child);
     let height = px(style.paddingTop) + px(style.paddingBottom);
     for (let start = 0; start < placed.length; start += columns) {
-        height += Math.max(...placed.slice(start, start + columns).map((child) => endHeight(child)));
+        height += Math.max(...placed.slice(start, start + columns).map((child) => endHeight(child, scale)));
     }
     return height;
 }
 
 /** How much the children of an element that lays them out one after another change in height as their folds slide. */
-function childChange(element: HTMLElement): number {
+function childChange(element: HTMLElement, scale: number): number {
     let change = 0;
     for (const child of element.children) {
-        change += endHeight(child as HTMLElement) - child.getBoundingClientRect().height;
+        change += endHeight(child as HTMLElement, scale) - child.getBoundingClientRect().height / scale;
     }
     return change;
 }
@@ -363,8 +364,9 @@ export class UpdatesCard extends LitElement {
         if (!card || !card.clientWidth) {
             return;
         }
-        // The card's whole width, border included, as the widths the columns give are.
-        const width = Math.round(card.getBoundingClientRect().width);
+        const scale = drawnScale(card);
+        // The card's whole width, border included, as the widths the columns give are, unscaled.
+        const width = Math.round(card.getBoundingClientRect().width / scale);
         if (width !== this.width) {
             this.width = width;
         }
@@ -382,12 +384,16 @@ export class UpdatesCard extends LitElement {
         for (const part of card.querySelectorAll(CARD_PARTS)) {
             const partStyle = getComputedStyle(part);
             const inner = part.classList.contains("list") ? (part.firstElementChild as HTMLElement | null) : null;
-            const height = part.classList.contains("list") ? (inner ? endHeight(inner) : 0) : part.getBoundingClientRect().height;
+            const height = part.classList.contains("list")
+                ? inner
+                    ? endHeight(inner, scale)
+                    : 0
+                : part.getBoundingClientRect().height / scale;
             content += px(partStyle.marginTop) + height + px(partStyle.marginBottom);
         }
         content -= this.spareShown(card);
-        const filled = filledHeight(Math.round(content), this.config ?? {}, limit);
-        const spare = Math.max(0, Math.floor(filled - content));
+        const filled = filledHeight(content, this.config ?? {}, limit);
+        const spare = spareRoom(filled, content);
         if (filled !== this.filled) {
             this.filled = filled;
         }
@@ -1586,19 +1592,20 @@ export class UpdatesCard extends LitElement {
                     margin-bottom: 20px;
                 }
 
-                /* The lines are centred as one block, so their icons line up. */
+                /* Each line is centred on its own, under the check. */
                 .idle-lines {
                     display: flex;
                     flex-direction: column;
+                    align-items: center;
                     gap: 4px;
                     min-width: 0;
                     max-width: 100%;
                 }
 
-                /* A line wraps rather than cut short, its icon by its first line, as the room scrolls when they don't fit. */
+                /* A line wraps rather than cut short, as the room scrolls when they don't fit, its icon centred on its text. */
                 .idle-line {
                     display: flex;
-                    align-items: flex-start;
+                    align-items: center;
                     gap: 6px;
                     max-width: 100%;
                     font-size: 12px;
