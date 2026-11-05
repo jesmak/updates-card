@@ -2143,9 +2143,12 @@ var UpdatesCard = class extends i4 {
                     color: var(--success-color, #43a047);
                 }
 
+                /* A letter's blank side bearing, about 0.083 em in Roboto, grows with the title's size, so the title moves left by
+                   its difference to the 12 px status line's to start where that line's letters do. */
                 .hd-title {
                     flex: 1 1 auto;
                     min-width: 0;
+                    margin-left: calc(12px * 0.083 - 0.083em);
                     font-size: var(--ha-card-header-font-size, 18px);
                     line-height: 1.4;
                 }
