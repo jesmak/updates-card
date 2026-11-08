@@ -1,4 +1,4 @@
-/*! updates-card 1.1.1 | MIT License */
+/*! updates-card 1.2.0 | MIT License */
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __decorateClass = (decorators, target, key, kind) => {
@@ -711,7 +711,7 @@ var c4 = e5(class extends i5 {
 });
 
 // src/const.ts
-var CARD_VERSION = "1.1.1";
+var CARD_VERSION = "1.2.0";
 var FEATURE_INSTALL = 1;
 var BUNCH_MIN = 3;
 var DONE_KEEP = 5 * 6e4;
@@ -828,6 +828,7 @@ var en_default = {
     all_current: "All up to date",
     current_unreachable: "Up to date \xB7 {n} unreachable",
     pending_count: "{n} waiting for an update",
+    attention_count: "{n} needing attention",
     all_updated: "All updated",
     current_count: "{n} up to date",
     unreachable_count: "{n} unreachable",
@@ -861,9 +862,22 @@ var en_default = {
     exclude_areas: "Excluded areas",
     exclude_areas_helper: "No update entities from these areas.",
     entities: "Entities",
-    entities_helper: "Exactly these update entities, instead of the integration and areas above.",
+    entities_helper: "Exactly these entities, instead of the integration and areas above. Besides update entities, a sensor that counts waiting updates, or a problem sensor, shown only while on.",
     exclude: "Excluded entities",
-    exclude_helper: "Update entities never shown in this group.",
+    exclude_helper: "Entities never shown in this group.",
+    list_attribute: "List attribute",
+    list_attribute_helper: "The attribute of a count sensor that lists what waits, shown when its row is opened.",
+    reason_attribute: "Reason attribute",
+    reason_attribute_helper: "The attribute of a problem sensor that tells what the problem is.",
+    age_attribute: "Age attribute",
+    age_attribute_helper: "The attribute that tells how many days the oldest update has waited.",
+    age_days: "Too old after days",
+    age_days_helper: "From this many days on, the row's value is shown in orange.",
+    names: "Names",
+    names_entity: "Entity",
+    names_entity_helper: "The entity whose row gets this name.",
+    names_name: "Name",
+    names_name_helper: "Shown instead of the name the card gives the row.",
     install_action: "Update all",
     install_action_helper: "What the Update all button does, such as a script that updates one device after another. Without it, there is no such button.",
     row_step: "Rounding in a sections view",
@@ -886,6 +900,7 @@ var fi_default = {
     all_current: "Kaikki ajan tasalla",
     current_unreachable: "Ajan tasalla \xB7 {n} ei tavoitettavissa",
     pending_count: "{n} odottaa p\xE4ivityst\xE4",
+    attention_count: "{n} vaatii huomiota",
     all_updated: "Kaikki p\xE4ivitetty",
     current_count: "{n} ajan tasalla",
     unreachable_count: "{n} ei tavoitettavissa",
@@ -919,9 +934,22 @@ var fi_default = {
     exclude_areas: "Pois j\xE4tett\xE4v\xE4t alueet",
     exclude_areas_helper: "Ei p\xE4ivitysentiteettej\xE4 n\xE4ilt\xE4 alueilta.",
     entities: "Entiteetit",
-    entities_helper: "Juuri n\xE4m\xE4 p\xE4ivitysentiteetit, yll\xE4 olevan integraation ja alueiden sijaan.",
+    entities_helper: "Juuri n\xE4m\xE4 entiteetit, yll\xE4 olevan integraation ja alueiden sijaan. P\xE4ivitysentiteettien lis\xE4ksi odottavia p\xE4ivityksi\xE4 laskeva sensori tai ongelmasensori, joka n\xE4ytet\xE4\xE4n vain p\xE4\xE4ll\xE4 ollessaan.",
     exclude: "Pois j\xE4tett\xE4v\xE4t entiteetit",
-    exclude_helper: "P\xE4ivitysentiteetit, joita ei koskaan n\xE4ytet\xE4 t\xE4ss\xE4 ryhm\xE4ss\xE4.",
+    exclude_helper: "Entiteetit, joita ei koskaan n\xE4ytet\xE4 t\xE4ss\xE4 ryhm\xE4ss\xE4.",
+    list_attribute: "Luettelon attribuutti",
+    list_attribute_helper: "Lukusensorin attribuutti, joka luettelee odottavat p\xE4ivitykset. Luettelo n\xE4ytet\xE4\xE4n, kun rivi avataan.",
+    reason_attribute: "Syyn attribuutti",
+    reason_attribute_helper: "Ongelmasensorin attribuutti, joka kertoo ongelman syyn.",
+    age_attribute: "I\xE4n attribuutti",
+    age_attribute_helper: "Attribuutti, joka kertoo, montako p\xE4iv\xE4\xE4 vanhin p\xE4ivitys on odottanut.",
+    age_days: "Liian vanha, p\xE4iv\xE4\xE4",
+    age_days_helper: "N\xE4in monesta p\xE4iv\xE4st\xE4 alkaen rivin lukema n\xE4ytet\xE4\xE4n oranssina.",
+    names: "Nimet",
+    names_entity: "Entiteetti",
+    names_entity_helper: "Entiteetti, jonka rivi saa t\xE4m\xE4n nimen.",
+    names_name: "Nimi",
+    names_name_helper: "N\xE4ytet\xE4\xE4n kortin antaman nimen sijaan.",
     install_action: "P\xE4ivit\xE4 kaikki",
     install_action_helper: "Mit\xE4 P\xE4ivit\xE4 kaikki -painike tekee, esimerkiksi skripti, joka p\xE4ivitt\xE4\xE4 laitteet yksi kerrallaan. Jos j\xE4t\xE4t asetuksen tyhj\xE4ksi, P\xE4ivit\xE4 kaikki -painiketta ei n\xE4ytet\xE4.",
     row_step: "Py\xF6ristys osioihin jaetussa n\xE4kym\xE4ss\xE4",
@@ -1055,6 +1083,10 @@ function tidyRowStep(config) {
 }
 
 // src/updates.ts
+var KINDS = { update: "update", sensor: "count", binary_sensor: "problem" };
+function kindOf(entityId) {
+  return KINDS[entityId.split(".")[0]];
+}
 function updateEntities(hass) {
   return Object.keys(hass.states).filter((id) => id.startsWith("update.") && !hass.entities?.[id]?.hidden);
 }
@@ -1071,7 +1103,7 @@ function areaOf(hass, entityId) {
 }
 function groupEntities(hass, group) {
   const exclude = new Set(group.exclude ?? []);
-  const chosen = group.entities?.length ? group.entities.filter((id) => id.startsWith("update.") && hass.states[id] !== void 0) : updateEntities(hass).filter((id) => {
+  const chosen = group.entities?.length ? group.entities.filter((id) => kindOf(id) !== void 0 && hass.states[id] !== void 0) : updateEntities(hass).filter((id) => {
     if (group.integration && hass.entities?.[id]?.platform !== group.integration) {
       return false;
     }
@@ -1104,9 +1136,10 @@ function deviceCounts(hass) {
   }
   return counts;
 }
-function rowOf(hass, entityId, counts) {
+function rowOf(hass, entityId, counts, options = {}) {
   const state = hass.states[entityId];
-  if (!state) {
+  const kind = kindOf(entityId);
+  if (!state || !kind) {
     return void 0;
   }
   const attributes = state.attributes;
@@ -1114,15 +1147,50 @@ function rowOf(hass, entityId, counts) {
   const device = entry?.device_id ? hass.devices?.[entry.device_id] : void 0;
   const count = entry?.device_id ? counts.get(entry.device_id) : void 0;
   const ownName = hass.formatEntityName?.(state, [{ type: "device" }, { type: "entity" }]) || String(attributes.friendly_name ?? entityId);
-  const name = device && (count?.updates ?? 1) <= 1 ? device.name_by_user || device.name || ownName : ownName;
+  const deviceName = device ? device.name_by_user || device.name || ownName : ownName;
+  let name = ownName;
+  if (options.name) {
+    name = options.name;
+  } else if (kind !== "update") {
+    name = deviceName;
+  } else if (device && (count?.updates ?? 1) <= 1) {
+    name = options.deviceShared ? hass.formatEntityName?.(state, [{ type: "entity" }]) || ownName : deviceName;
+  }
   const title = typeof attributes.title === "string" && attributes.title ? attributes.title : void 0;
-  const software = title ?? (device?.entry_type === "service" ? name : entry?.platform ?? ownName);
   const others = count ? count.states - 1 : 0;
   const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
   const unreachable = state.state === "unavailable" || others > 0 && othersDown === others;
+  const group = options.group;
+  const age = group?.age_attribute ? Number(attributes[group.age_attribute]) : NaN;
+  const old = group?.age_days ? age >= group.age_days : false;
+  if (kind !== "update") {
+    const attribute = kind === "count" ? group?.list_attribute : group?.reason_attribute;
+    const listed = attribute ? attributes[attribute] : void 0;
+    const items = Array.isArray(listed) ? listed.map(String) : typeof listed === "string" && listed ? [listed] : [];
+    const unit = attributes.unit_of_measurement;
+    const pending = !unreachable && (kind === "count" ? Number(state.state) > 0 : state.state === "on");
+    return {
+      entity_id: entityId,
+      kind,
+      name,
+      software: name,
+      softwareKey: `\0${entityId}`,
+      installed: "",
+      latest: "",
+      pending,
+      installing: false,
+      canInstall: false,
+      unreachable,
+      quantity: kind === "count" ? typeof unit === "string" && unit ? `${state.state} ${unit}` : state.state : void 0,
+      items,
+      old
+    };
+  }
+  const software = title ?? (device?.entry_type === "service" ? name : entry?.platform ?? ownName);
   const progress = attributes.in_progress;
   return {
     entity_id: entityId,
+    kind,
     name,
     software,
     softwareKey: `${entry?.platform ?? ""}\0${software}`,
@@ -1131,7 +1199,8 @@ function rowOf(hass, entityId, counts) {
     pending: state.state === "on" && !unreachable,
     installing: progress === true || typeof progress === "number",
     canInstall: (Number(attributes.supported_features ?? 0) & FEATURE_INSTALL) !== 0,
-    unreachable
+    unreachable,
+    old
   };
 }
 function versionText(value) {
@@ -1140,11 +1209,24 @@ function versionText(value) {
 function groupsOf(hass, config, language) {
   const counts = deviceCounts(hass);
   const collator = new Intl.Collator(language);
-  return groupConfigs(config).map((group, index) => ({
-    key: String(index),
-    name: group.name || void 0,
-    rows: groupEntities(hass, group).map((id) => rowOf(hass, id, counts)).filter((row) => row !== void 0).sort((a3, b3) => collator.compare(a3.name, b3.name))
-  }));
+  const names = new Map((config.names ?? []).filter((entry) => entry?.entity && entry.name).map((entry) => [entry.entity, entry.name]));
+  return groupConfigs(config).map((group, index) => {
+    const entities = groupEntities(hass, group);
+    const perDevice = /* @__PURE__ */ new Map();
+    for (const id of entities) {
+      const device = hass.entities?.[id]?.device_id;
+      if (device) {
+        perDevice.set(device, (perDevice.get(device) ?? 0) + 1);
+      }
+    }
+    const shared = (id) => (perDevice.get(hass.entities?.[id]?.device_id ?? "") ?? 0) > 1;
+    return {
+      key: String(index),
+      name: group.name || void 0,
+      rows: entities.map((id) => rowOf(hass, id, counts, { name: names.get(id), deviceShared: shared(id), group })).filter((row) => row !== void 0 && (row.kind !== "problem" || row.pending)).sort((a3, b3) => collator.compare(a3.name, b3.name)),
+      entities
+    };
+  });
 }
 function bunchesOf(rows) {
   const byKey = /* @__PURE__ */ new Map();
@@ -1199,6 +1281,7 @@ function statusOf(row, install, now) {
 }
 
 // src/editor.ts
+var ROW_DOMAINS = ["update", "sensor", "binary_sensor"];
 function schema(hass, config, text) {
   const field = (name, selector) => ({
     label: text(`editor.${name}`),
@@ -1220,8 +1303,25 @@ function schema(hass, config, text) {
             }),
             areas: field("areas", { area: { multiple: true } }),
             exclude_areas: field("exclude_areas", { area: { multiple: true } }),
-            entities: field("entities", { entity: { multiple: true, filter: { domain: "update" } } }),
-            exclude: field("exclude", { entity: { multiple: true, filter: { domain: "update" } } })
+            entities: field("entities", { entity: { multiple: true, filter: { domain: ROW_DOMAINS } } }),
+            exclude: field("exclude", { entity: { multiple: true, filter: { domain: ROW_DOMAINS } } }),
+            list_attribute: field("list_attribute", { text: {} }),
+            reason_attribute: field("reason_attribute", { text: {} }),
+            age_attribute: field("age_attribute", { text: {} }),
+            age_days: field("age_days", { number: { min: 1, mode: "box" } })
+          }
+        }
+      }
+    },
+    {
+      name: "names",
+      selector: {
+        object: {
+          multiple: true,
+          label_field: "name",
+          fields: {
+            entity: field("names_entity", { entity: { filter: { domain: ROW_DOMAINS } } }),
+            name: field("names_name", { text: {} })
           }
         }
       }
@@ -1259,7 +1359,10 @@ var UpdatesCardEditor = class extends i4 {
     if (config.groups) {
       config.groups = config.groups.map((group) => Object.fromEntries(Object.entries(group).filter(([, value]) => !empty(value))));
     }
-    for (const key of ["title", "groups", "install_action"]) {
+    if (config.names) {
+      config.names = config.names.filter((entry) => entry?.entity && entry.name);
+    }
+    for (const key of ["title", "groups", "names", "install_action"]) {
       if (empty(config[key])) {
         delete config[key];
       }
@@ -1408,7 +1511,7 @@ var UpdatesCard = class extends i4 {
     return {};
   }
   setConfig(config) {
-    if (!config || config.groups !== void 0 && !Array.isArray(config.groups)) {
+    if (!config || config.groups !== void 0 && !Array.isArray(config.groups) || config.names !== void 0 && !Array.isArray(config.names)) {
       throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
     }
     if (!validHeight(config)) {
@@ -1681,7 +1784,8 @@ var UpdatesCard = class extends i4 {
       window.clearInterval(this.timer);
       this.timer = void 0;
     }
-    this.watched = [...rows.keys(), ...[...rows.keys()].flatMap((id) => this.siblingIds(hass, id)), ...script ? [script] : []];
+    const held = [...new Set(this.groupList.flatMap((g2) => g2.entities))];
+    this.watched = [...held, ...held.flatMap((id) => this.siblingIds(hass, id)), ...script ? [script] : []];
   }
   /** The other entities of an entity's device, which tell whether the device is out of reach. */
   siblingIds(hass, entityId) {
@@ -1703,7 +1807,7 @@ var UpdatesCard = class extends i4 {
     }
     const title = this.config.title ?? this.text("common.title");
     const all = new Map(this.groupList.flatMap((g2) => g2.rows.map((r6) => [r6.entity_id, r6])));
-    if (all.size === 0) {
+    if (this.groupList.every((g2) => g2.entities.length === 0)) {
       return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()}>
                 <div class="hd"><div class="hd-title" title=${title}>${title}</div></div>
                 <div class="message">${this.text("common.no_entities")}</div>
@@ -1726,7 +1830,7 @@ var UpdatesCard = class extends i4 {
       action = b2`<button class="action ghost" @click=${() => this.stop(script)}>
                 <ha-icon icon="mdi:stop"></ha-icon><span>${this.text("common.stop")}</span>
             </button>`;
-    } else if (installAction(this.config) && active.some((s5) => s5.row.pending)) {
+    } else if (installAction(this.config) && active.some((s5) => s5.row.pending && s5.row.canInstall)) {
       const label = this.text("common.update_all");
       action = b2`<button
                 class="action"
@@ -1760,25 +1864,27 @@ var UpdatesCard = class extends i4 {
   }
   /**
    * While nothing waits, as in wud-queue-card: the header with a check, the status line, and the line of those up to date,
-   * which opens to the rows up to date and those out of reach, by group.
+   * which opens to the rows up to date and those out of reach, by group. With no rows at all, as when the groups hold only
+   * problem sensors that are off, there is no line to open.
    */
   folded(title, current, unreachable) {
     const status = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current");
     const count = current > 0 ? this.text("common.current_count", { n: current }) : this.text("common.unreachable_count", { n: unreachable });
-    const idle = this.setHeight() && !this.open;
+    const rows = current + unreachable > 0;
+    const idle = this.setHeight() && (!this.open || !rows);
     return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
             <div class="hd">
                 <ha-icon class="hd-icon" icon="mdi:check-circle-outline"></ha-icon>
                 <div class="hd-title" title=${title}>${title}</div>
             </div>
             <div class="hd-sub" title=${status}>${status}</div>
-            <button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
-                <span class="switch-text" title=${count}>${count}</span>
-                <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
-            </button>
-            <div class="list ${idle ? "shut" : ""}">
-                ${this.fold(this.open, b2`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
-            </div>
+            ${rows ? b2`<button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
+                              <span class="switch-text" title=${count}>${count}</span>
+                              <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
+                          </button>
+                          <div class="list ${idle ? "shut" : ""}">
+                              ${this.fold(this.open, b2`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
+                          </div>` : A}
             ${idle ? this.idle() : A}
         </ha-card>`;
   }
@@ -1893,6 +1999,12 @@ var UpdatesCard = class extends i4 {
   }
   waitingRow(shown, busy) {
     const { row, status, install } = shown;
+    if (row.kind === "count") {
+      return this.countRow(row);
+    }
+    if (row.kind === "problem") {
+      return this.problemRow(row);
+    }
     const offerInstall = row.canInstall && !row.unreachable && !this.running && (status === "pending" || status === "failed");
     const label = this.text("common.install", { name: row.name });
     return b2`
@@ -1905,7 +2017,7 @@ var UpdatesCard = class extends i4 {
             >
                 <div class="info">
                     <div class="name">${row.name}</div>
-                    ${this.versions(row.installed, row.latest)}
+                    ${this.versions(row.installed, row.latest, row.old)}
                 </div>
                 <div class="end">
                     ${offerInstall ? b2`<button
@@ -1925,6 +2037,50 @@ var UpdatesCard = class extends i4 {
             ${status === "failed" ? b2`<div class="errline">${install?.error || this.text("common.not_installed", { version: row.installed })}</div>` : A}
         `;
   }
+  /**
+   * A sensor counting waiting updates, with its count. One with a list opens to it, as a bunch opens to its rows, and
+   * one without opens its entity.
+   */
+  countRow(row) {
+    const items = row.items ?? [];
+    if (items.length === 0) {
+      return b2`<div
+                class="row"
+                role="button"
+                tabindex="0"
+                @click=${() => this.moreInfo(row.entity_id)}
+                @keydown=${this.onKey(row.entity_id)}
+            >
+                <div class="info">
+                    <div class="name">${row.name}</div>
+                    ${this.quantity(row)}
+                </div>
+            </div>`;
+    }
+    const key = `list\0${row.entity_id}`;
+    const isOpen = this.opened.has(key);
+    return b2`
+            <button class="sum" aria-expanded=${isOpen ? "true" : "false"} @click=${() => this.toggle(key)}>
+                <ha-icon class="chev" icon=${isOpen ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
+                <span class="info"><span class="name">${row.name}</span>${this.quantity(row)}</span>
+            </button>
+            ${this.fold(isOpen, b2`<div class="grp-body">${items.map((item) => b2`<div class="item">${item}</div>`)}</div>`)}
+        `;
+  }
+  /** A problem sensor that is on, with what its list says the problem is. */
+  problemRow(row) {
+    const items = row.items ?? [];
+    return b2`
+            <div class="row" role="button" tabindex="0" @click=${() => this.moreInfo(row.entity_id)} @keydown=${this.onKey(row.entity_id)}>
+                <div class="info"><div class="name">${row.name}</div></div>
+                <div class="end"><ha-icon class="alert" icon="mdi:alert-circle-outline"></ha-icon></div>
+            </div>
+            ${items.length > 0 ? b2`<div class="noteline">${items.map((item) => b2`<div>${item}</div>`)}</div>` : A}
+        `;
+  }
+  quantity(row) {
+    return b2`<span class="ver qty ${row.old ? "old" : ""}">${row.quantity}</span>`;
+  }
   currentRow(row) {
     return b2`<div
             class="row sib muted"
@@ -1934,7 +2090,7 @@ var UpdatesCard = class extends i4 {
             @keydown=${this.onKey(row.entity_id)}
         >
             <div class="info"><div class="name">${row.name}</div></div>
-            <div class="end"><span class="ver">${row.installed}</span></div>
+            <div class="end"><span class="ver">${row.kind === "count" ? row.quantity : row.installed}</span></div>
         </div>`;
   }
   /**
@@ -1982,8 +2138,8 @@ var UpdatesCard = class extends i4 {
             <div class="fold-in">${content}</div>
         </div>`;
   }
-  versions(from, to) {
-    return b2`<span class="ver">${from ? `${from} \u2192 ` : "\u2192 "}<span class="new">${to}</span></span>`;
+  versions(from, to, old = false) {
+    return b2`<span class="ver ${old ? "old" : ""}">${from ? `${from} \u2192 ` : "\u2192 "}<span class="new">${to}</span></span>`;
   }
   pill(status) {
     return b2`<span class="pill ${status}">
@@ -2003,8 +2159,13 @@ var UpdatesCard = class extends i4 {
     if (names("failed")) {
       return this.text("common.failed", { name: names("failed") });
     }
-    const pending = active.filter((s5) => s5.row.pending).length;
-    return pending > 0 ? this.text("common.pending_count", { n: pending }) : this.text("common.all_updated");
+    const pending = active.filter((s5) => s5.row.pending && s5.row.kind !== "problem").length;
+    const problems = active.filter((s5) => s5.row.pending && s5.row.kind === "problem").length;
+    const parts = [
+      pending > 0 ? this.text("common.pending_count", { n: pending }) : "",
+      problems > 0 ? this.text("common.attention_count", { n: problems }) : ""
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" \xB7 ") : this.text("common.all_updated");
   }
   /** A thin bar with a segment per row of the run, coloured by how it is going. */
   progress(runs) {
@@ -2445,6 +2606,47 @@ var UpdatesCard = class extends i4 {
                     font-size: 12px;
                     color: var(--error-color, #db4437);
                     background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                }
+
+                /* A count reads as a quantity rather than a version. */
+                .ver.qty {
+                    font-family: inherit;
+                    font-size: 12px;
+                }
+
+                /* The oldest update has waited too long. */
+                .ver.old,
+                .ver.old .new {
+                    color: var(--warning-color, #ffa600);
+                }
+
+                /* A line of a count's list, such as a package with its version. */
+                .item {
+                    padding: 1px 12px;
+                    font-family: var(--ha-font-family-code, ui-monospace, monospace);
+                    font-size: 11.5px;
+                    line-height: 1.5;
+                    color: var(--secondary-text-color);
+                    overflow-wrap: anywhere;
+                }
+
+                .grp-body .item:last-child {
+                    padding-bottom: 6px;
+                }
+
+                .alert {
+                    color: var(--warning-color, #ffa600);
+                    --mdc-icon-size: 20px;
+                }
+
+                .noteline {
+                    margin: 0 12px 6px 12px;
+                    padding: 6px 9px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: var(--primary-text-color);
+                    background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.14);
+                    overflow-wrap: anywhere;
                 }
 
                 .row.sib {

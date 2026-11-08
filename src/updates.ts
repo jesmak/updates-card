@@ -8,7 +8,14 @@
  */
 import { BUNCH_MIN, FEATURE_INSTALL, VERSION_WAIT } from "./const";
 import type { HassEntity, HomeAssistant } from "./hass";
-import type { ActionConfig, Bunch, Group, GroupConfig, Row, UpdatesCardConfig } from "./types";
+import type { ActionConfig, Bunch, Group, GroupConfig, Row, RowKind, UpdatesCardConfig } from "./types";
+
+/** What an entity of each domain a group lists is as a row. Only update entities are found by the filters. */
+const KINDS: Record<string, RowKind> = { update: "update", sensor: "count", binary_sensor: "problem" };
+
+function kindOf(entityId: string): RowKind | undefined {
+    return KINDS[entityId.split(".")[0]];
+}
 
 /** Every update entity there is, except those hidden in the registry. */
 export function updateEntities(hass: HomeAssistant): string[] {
@@ -34,7 +41,7 @@ function areaOf(hass: HomeAssistant, entityId: string): string | undefined {
 export function groupEntities(hass: HomeAssistant, group: GroupConfig): string[] {
     const exclude = new Set(group.exclude ?? []);
     const chosen = group.entities?.length
-        ? group.entities.filter((id) => id.startsWith("update.") && hass.states[id] !== undefined)
+        ? group.entities.filter((id) => kindOf(id) !== undefined && hass.states[id] !== undefined)
         : updateEntities(hass).filter((id) => {
               if (group.integration && hass.entities?.[id]?.platform !== group.integration) {
                   return false;
@@ -91,19 +98,33 @@ export function deviceCounts(hass: HomeAssistant): Map<string, DeviceCounts> {
 }
 
 /**
- * An update entity as a row. A device's update entity is named after its device, as the entity's own name adds only
- * "Firmware" to it, unless the device has several update entities, which the device's name wouldn't tell apart.
+ * How a row is named and what of its entity it reads: the user's own name for it, whether its device has another entity
+ * in the same group, and the group's list, reason and age attributes.
+ */
+export interface RowOptions {
+    name?: string;
+    deviceShared?: boolean;
+    group?: GroupConfig;
+}
+
+/**
+ * An entity as a row. A device's update entity is named after its device, as the entity's own name adds only
+ * "Firmware" to it, unless the device has several update entities, which the device's name wouldn't tell apart, or
+ * another entity in the same group, which would then share the name. A count or problem sensor is named after its
+ * device, as its unit or its list tells what it is. A name of the user's own wins over all of these.
  *
  * Without a title, the software is the integration's, as for the firmware of Zigbee2MQTT's devices, unless the device
- * is a service, which is software of its own. The Marketplace gives its downloads no title.
+ * is a service, which is software of its own. The Marketplace gives its downloads no title. A sensor's row is software
+ * of its own, so it never bunches.
  *
  * A row is out of reach when its entity is unavailable, or when every other entity of its device is down. ESPHome keeps
  * the update entity available after a disconnect the device announced, such as going to sleep, and so may other
  * integrations.
  */
-export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string, DeviceCounts>): Row | undefined {
+export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string, DeviceCounts>, options: RowOptions = {}): Row | undefined {
     const state = hass.states[entityId];
-    if (!state) {
+    const kind = kindOf(entityId);
+    if (!state || !kind) {
         return undefined;
     }
     const attributes = state.attributes;
@@ -112,15 +133,50 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
     const count = entry?.device_id ? counts.get(entry.device_id) : undefined;
     const ownName =
         hass.formatEntityName?.(state, [{ type: "device" }, { type: "entity" }]) || String(attributes.friendly_name ?? entityId);
-    const name = device && (count?.updates ?? 1) <= 1 ? device.name_by_user || device.name || ownName : ownName;
+    const deviceName = device ? device.name_by_user || device.name || ownName : ownName;
+    let name = ownName;
+    if (options.name) {
+        name = options.name;
+    } else if (kind !== "update") {
+        name = deviceName;
+    } else if (device && (count?.updates ?? 1) <= 1) {
+        name = options.deviceShared ? hass.formatEntityName?.(state, [{ type: "entity" }]) || ownName : deviceName;
+    }
     const title = typeof attributes.title === "string" && attributes.title ? attributes.title : undefined;
-    const software = title ?? (device?.entry_type === "service" ? name : (entry?.platform ?? ownName));
     const others = count ? count.states - 1 : 0;
     const othersDown = count ? count.down - (isDown(state) ? 1 : 0) : 0;
     const unreachable = state.state === "unavailable" || (others > 0 && othersDown === others);
+    const group = options.group;
+    const age = group?.age_attribute ? Number(attributes[group.age_attribute]) : NaN;
+    const old = group?.age_days ? age >= group.age_days : false;
+    if (kind !== "update") {
+        const attribute = kind === "count" ? group?.list_attribute : group?.reason_attribute;
+        const listed = attribute ? attributes[attribute] : undefined;
+        const items = Array.isArray(listed) ? listed.map(String) : typeof listed === "string" && listed ? [listed] : [];
+        const unit = attributes.unit_of_measurement;
+        const pending = !unreachable && (kind === "count" ? Number(state.state) > 0 : state.state === "on");
+        return {
+            entity_id: entityId,
+            kind,
+            name,
+            software: name,
+            softwareKey: `\u0000${entityId}`,
+            installed: "",
+            latest: "",
+            pending,
+            installing: false,
+            canInstall: false,
+            unreachable,
+            quantity: kind === "count" ? (typeof unit === "string" && unit ? `${state.state} ${unit}` : state.state) : undefined,
+            items,
+            old,
+        };
+    }
+    const software = title ?? (device?.entry_type === "service" ? name : (entry?.platform ?? ownName));
     const progress = attributes.in_progress;
     return {
         entity_id: entityId,
+        kind,
         name,
         software,
         softwareKey: `${entry?.platform ?? ""}\u0000${software}`,
@@ -130,6 +186,7 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
         installing: progress === true || typeof progress === "number",
         canInstall: (Number(attributes.supported_features ?? 0) & FEATURE_INSTALL) !== 0,
         unreachable,
+        old,
     };
 }
 
@@ -137,18 +194,35 @@ function versionText(value: unknown): string {
     return value === null || value === undefined ? "" : String(value);
 }
 
-/** The groups with their rows, sorted by name in the viewer's language. */
+/**
+ * The groups with their rows, sorted by name in the viewer's language. A problem sensor has a row only while it is on.
+ * Whether a device has more than one entity in a group counts those that are off too, so a row's name doesn't change
+ * as one comes and goes.
+ */
 export function groupsOf(hass: HomeAssistant, config: UpdatesCardConfig, language: string): Group[] {
     const counts = deviceCounts(hass);
     const collator = new Intl.Collator(language);
-    return groupConfigs(config).map((group, index) => ({
-        key: String(index),
-        name: group.name || undefined,
-        rows: groupEntities(hass, group)
-            .map((id) => rowOf(hass, id, counts))
-            .filter((row): row is Row => row !== undefined)
-            .sort((a, b) => collator.compare(a.name, b.name)),
-    }));
+    const names = new Map((config.names ?? []).filter((entry) => entry?.entity && entry.name).map((entry) => [entry.entity, entry.name]));
+    return groupConfigs(config).map((group, index) => {
+        const entities = groupEntities(hass, group);
+        const perDevice = new Map<string, number>();
+        for (const id of entities) {
+            const device = hass.entities?.[id]?.device_id;
+            if (device) {
+                perDevice.set(device, (perDevice.get(device) ?? 0) + 1);
+            }
+        }
+        const shared = (id: string) => (perDevice.get(hass.entities?.[id]?.device_id ?? "") ?? 0) > 1;
+        return {
+            key: String(index),
+            name: group.name || undefined,
+            rows: entities
+                .map((id) => rowOf(hass, id, counts, { name: names.get(id), deviceShared: shared(id), group }))
+                .filter((row): row is Row => row !== undefined && (row.kind !== "problem" || row.pending))
+                .sort((a, b) => collator.compare(a.name, b.name)),
+            entities,
+        };
+    });
 }
 
 /**

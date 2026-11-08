@@ -1,7 +1,8 @@
 /**
  * A dashboard card for Home Assistant's update entities, in groups. With nothing waiting, it says so under a check, and
  * the line of those up to date opens to the entities. With updates waiting, each group shows only those, and waiting rows that update
- * the same software to the same version fold into one summary row.
+ * the same software to the same version fold into one summary row. A group may also list sensors that count waiting
+ * updates, such as a host's packages, and problem sensors, which show only while on.
  *
  * A row's button installs that row alone, one at a time. Installing everything is left to an action of the user's own,
  * such as a script that installs one device after another. While such a script runs, the card follows it, hides the
@@ -212,7 +213,11 @@ export class UpdatesCard extends LitElement {
     }
 
     public setConfig(config: UpdatesCardConfig): void {
-        if (!config || (config.groups !== undefined && !Array.isArray(config.groups))) {
+        if (
+            !config ||
+            (config.groups !== undefined && !Array.isArray(config.groups)) ||
+            (config.names !== undefined && !Array.isArray(config.names))
+        ) {
             throw new Error(translate(browserLanguage(), "common.invalid_configuration"));
         }
         if (!validHeight(config)) {
@@ -560,7 +565,9 @@ export class UpdatesCard extends LitElement {
             window.clearInterval(this.timer);
             this.timer = undefined;
         }
-        this.watched = [...rows.keys(), ...[...rows.keys()].flatMap((id) => this.siblingIds(hass, id)), ...(script ? [script] : [])];
+        // Every entity the groups hold, as a problem sensor that is off has no row until it turns on.
+        const held = [...new Set(this.groupList.flatMap((g) => g.entities))];
+        this.watched = [...held, ...held.flatMap((id) => this.siblingIds(hass, id)), ...(script ? [script] : [])];
     }
 
     /** The other entities of an entity's device, which tell whether the device is out of reach. */
@@ -584,7 +591,8 @@ export class UpdatesCard extends LitElement {
         }
         const title = this.config.title ?? this.text("common.title");
         const all = new Map(this.groupList.flatMap((g) => g.rows.map((r) => [r.entity_id, r] as const)));
-        if (all.size === 0) {
+        // A group may hold only problem sensors that are off, which have no rows and mean all is well.
+        if (this.groupList.every((g) => g.entities.length === 0)) {
             return html`<ha-card class=${this.cardClass()} style=${this.cardStyle()}>
                 <div class="hd"><div class="hd-title" title=${title}>${title}</div></div>
                 <div class="message">${this.text("common.no_entities")}</div>
@@ -609,7 +617,7 @@ export class UpdatesCard extends LitElement {
             action = html`<button class="action ghost" @click=${() => this.stop(script)}>
                 <ha-icon icon="mdi:stop"></ha-icon><span>${this.text("common.stop")}</span>
             </button>`;
-        } else if (installAction(this.config) && active.some((s) => s.row.pending)) {
+        } else if (installAction(this.config) && active.some((s) => s.row.pending && s.row.canInstall)) {
             const label = this.text("common.update_all");
             action = html`<button
                 class="action"
@@ -649,26 +657,32 @@ export class UpdatesCard extends LitElement {
 
     /**
      * While nothing waits, as in wud-queue-card: the header with a check, the status line, and the line of those up to date,
-     * which opens to the rows up to date and those out of reach, by group.
+     * which opens to the rows up to date and those out of reach, by group. With no rows at all, as when the groups hold only
+     * problem sensors that are off, there is no line to open.
      */
     private folded(title: string, current: number, unreachable: number): TemplateResult {
         const status = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current");
         const count =
             current > 0 ? this.text("common.current_count", { n: current }) : this.text("common.unreachable_count", { n: unreachable });
-        const idle = this.setHeight() && !this.open;
+        const rows = current + unreachable > 0;
+        const idle = this.setHeight() && (!this.open || !rows);
         return html`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
             <div class="hd">
                 <ha-icon class="hd-icon" icon="mdi:check-circle-outline"></ha-icon>
                 <div class="hd-title" title=${title}>${title}</div>
             </div>
             <div class="hd-sub" title=${status}>${status}</div>
-            <button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
-                <span class="switch-text" title=${count}>${count}</span>
-                <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
-            </button>
-            <div class="list ${idle ? "shut" : ""}">
-                ${this.fold(this.open, html`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
-            </div>
+            ${
+                rows
+                    ? html`<button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
+                              <span class="switch-text" title=${count}>${count}</span>
+                              <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
+                          </button>
+                          <div class="list ${idle ? "shut" : ""}">
+                              ${this.fold(this.open, html`<div class="cols">${this.groupList.map((group) => this.quietGroup(group))}</div>`)}
+                          </div>`
+                    : nothing
+            }
             ${idle ? this.idle() : nothing}
         </ha-card>`;
     }
@@ -800,6 +814,12 @@ export class UpdatesCard extends LitElement {
 
     private waitingRow(shown: Shown, busy: boolean): TemplateResult {
         const { row, status, install } = shown;
+        if (row.kind === "count") {
+            return this.countRow(row);
+        }
+        if (row.kind === "problem") {
+            return this.problemRow(row);
+        }
         const offerInstall = row.canInstall && !row.unreachable && !this.running && (status === "pending" || status === "failed");
         const label = this.text("common.install", { name: row.name });
         return html`
@@ -812,7 +832,7 @@ export class UpdatesCard extends LitElement {
             >
                 <div class="info">
                     <div class="name">${row.name}</div>
-                    ${this.versions(row.installed, row.latest)}
+                    ${this.versions(row.installed, row.latest, row.old)}
                 </div>
                 <div class="end">
                     ${
@@ -837,6 +857,53 @@ export class UpdatesCard extends LitElement {
         `;
     }
 
+    /**
+     * A sensor counting waiting updates, with its count. One with a list opens to it, as a bunch opens to its rows, and
+     * one without opens its entity.
+     */
+    private countRow(row: Row): TemplateResult {
+        const items = row.items ?? [];
+        if (items.length === 0) {
+            return html`<div
+                class="row"
+                role="button"
+                tabindex="0"
+                @click=${() => this.moreInfo(row.entity_id)}
+                @keydown=${this.onKey(row.entity_id)}
+            >
+                <div class="info">
+                    <div class="name">${row.name}</div>
+                    ${this.quantity(row)}
+                </div>
+            </div>`;
+        }
+        const key = `list\u0000${row.entity_id}`;
+        const isOpen = this.opened.has(key);
+        return html`
+            <button class="sum" aria-expanded=${isOpen ? "true" : "false"} @click=${() => this.toggle(key)}>
+                <ha-icon class="chev" icon=${isOpen ? "mdi:chevron-down" : "mdi:chevron-right"}></ha-icon>
+                <span class="info"><span class="name">${row.name}</span>${this.quantity(row)}</span>
+            </button>
+            ${this.fold(isOpen, html`<div class="grp-body">${items.map((item) => html`<div class="item">${item}</div>`)}</div>`)}
+        `;
+    }
+
+    /** A problem sensor that is on, with what its list says the problem is. */
+    private problemRow(row: Row): TemplateResult {
+        const items = row.items ?? [];
+        return html`
+            <div class="row" role="button" tabindex="0" @click=${() => this.moreInfo(row.entity_id)} @keydown=${this.onKey(row.entity_id)}>
+                <div class="info"><div class="name">${row.name}</div></div>
+                <div class="end"><ha-icon class="alert" icon="mdi:alert-circle-outline"></ha-icon></div>
+            </div>
+            ${items.length > 0 ? html`<div class="noteline">${items.map((item) => html`<div>${item}</div>`)}</div>` : nothing}
+        `;
+    }
+
+    private quantity(row: Row): TemplateResult {
+        return html`<span class="ver qty ${row.old ? "old" : ""}">${row.quantity}</span>`;
+    }
+
     private currentRow(row: Row): TemplateResult {
         return html`<div
             class="row sib muted"
@@ -846,7 +913,7 @@ export class UpdatesCard extends LitElement {
             @keydown=${this.onKey(row.entity_id)}
         >
             <div class="info"><div class="name">${row.name}</div></div>
-            <div class="end"><span class="ver">${row.installed}</span></div>
+            <div class="end"><span class="ver">${row.kind === "count" ? row.quantity : row.installed}</span></div>
         </div>`;
     }
 
@@ -898,8 +965,8 @@ export class UpdatesCard extends LitElement {
         </div>`;
     }
 
-    private versions(from: string | undefined, to: string): TemplateResult {
-        return html`<span class="ver">${from ? `${from} → ` : "→ "}<span class="new">${to}</span></span>`;
+    private versions(from: string | undefined, to: string, old = false): TemplateResult {
+        return html`<span class="ver ${old ? "old" : ""}">${from ? `${from} → ` : "→ "}<span class="new">${to}</span></span>`;
     }
 
     private pill(status: "running" | "done" | "failed"): TemplateResult {
@@ -928,8 +995,14 @@ export class UpdatesCard extends LitElement {
         if (names("failed")) {
             return this.text("common.failed", { name: names("failed") });
         }
-        const pending = active.filter((s) => s.row.pending).length;
-        return pending > 0 ? this.text("common.pending_count", { n: pending }) : this.text("common.all_updated");
+        // A problem, such as a reboot, isn't an update, so it is counted apart.
+        const pending = active.filter((s) => s.row.pending && s.row.kind !== "problem").length;
+        const problems = active.filter((s) => s.row.pending && s.row.kind === "problem").length;
+        const parts = [
+            pending > 0 ? this.text("common.pending_count", { n: pending }) : "",
+            problems > 0 ? this.text("common.attention_count", { n: problems }) : "",
+        ].filter(Boolean);
+        return parts.length > 0 ? parts.join(" · ") : this.text("common.all_updated");
     }
 
     /** A thin bar with a segment per row of the run, coloured by how it is going. */
@@ -1383,6 +1456,47 @@ export class UpdatesCard extends LitElement {
                     font-size: 12px;
                     color: var(--error-color, #db4437);
                     background: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+                }
+
+                /* A count reads as a quantity rather than a version. */
+                .ver.qty {
+                    font-family: inherit;
+                    font-size: 12px;
+                }
+
+                /* The oldest update has waited too long. */
+                .ver.old,
+                .ver.old .new {
+                    color: var(--warning-color, #ffa600);
+                }
+
+                /* A line of a count's list, such as a package with its version. */
+                .item {
+                    padding: 1px 12px;
+                    font-family: var(--ha-font-family-code, ui-monospace, monospace);
+                    font-size: 11.5px;
+                    line-height: 1.5;
+                    color: var(--secondary-text-color);
+                    overflow-wrap: anywhere;
+                }
+
+                .grp-body .item:last-child {
+                    padding-bottom: 6px;
+                }
+
+                .alert {
+                    color: var(--warning-color, #ffa600);
+                    --mdc-icon-size: 20px;
+                }
+
+                .noteline {
+                    margin: 0 12px 6px 12px;
+                    padding: 6px 9px;
+                    border-radius: 8px;
+                    font-size: 12px;
+                    color: var(--primary-text-color);
+                    background: rgba(var(--rgb-warning-color, 255, 166, 0), 0.14);
+                    overflow-wrap: anywhere;
                 }
 
                 .row.sib {

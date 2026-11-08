@@ -167,6 +167,7 @@ describe("rowOf", () => {
 describe("bunchesOf", () => {
     const make = (id: string, software: string, installed: string, latest: string, platform = "esphome"): Row => ({
         entity_id: id,
+        kind: "update",
         name: id,
         software,
         softwareKey: `${platform}\u0000${software}`,
@@ -277,6 +278,7 @@ describe("statusOf", () => {
     const NOW = 1_000_000;
     const row = (patch: Partial<Row>): Row => ({
         entity_id: "update.plug",
+        kind: "update",
         name: "Plug",
         software: "ESPHome",
         softwareKey: "esphome\u0000ESPHome",

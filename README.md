@@ -26,6 +26,9 @@ of your own, such as a script that installs one device after another and skips t
 a script runs, the card follows it, shows how far it has got, hides the rows' buttons so nothing installs alongside
 it, and offers to stop it.
 
+Updates that have no update entity can go in too, as a sensor that counts them, such as a server's waiting packages, and
+a problem sensor that says something needs attention.
+
 ## Installation
 
 ### With the Marketplace
@@ -52,24 +55,30 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
 | ---------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `title`          | string | The card's title                                                                                                                                                                                                                                                                                                 | "Updates" in the viewer's language                                              |
 | `groups`         | list   | The groups, each with the options below                                                                                                                                                                                                                                                                          | Every update entity in one group                                                |
+| `names`          | list   | Names of your own for single rows, each an `entity` and the `name` its row shows instead of the one the card gives it                                                                                                                                                                                            |                                                                                 |
 | `install_action` | action | What the **Update all** button does, as any dashboard action. A script is followed while it runs (below). Without it, there is no such button                                                                                                                                                                    |                                                                                 |
 | `height_mode`    | string | How tall the card is. `auto` fits its content, `fixed` keeps it at `height`, `max` lets it grow up to `max_height`. In `fixed` and `max` the list scrolls. A height in grid rows, set in the layout tab of a sections view, is used instead                                                                      | `fixed` when `height` is set, `max` when only `max_height` is, otherwise `auto` |
 | `height`         | number | The card's height in pixels, for `fixed`                                                                                                                                                                                                                                                                         |                                                                                 |
 | `max_height`     | number | The card's greatest height in pixels, for `max`                                                                                                                                                                                                                                                                  |                                                                                 |
 | `row_step`       | string | How the card rounds its height on automatic rows in a sections view, with `height_mode` `auto` or `max`. `full` rounds up to whole rows, with the room left over under the header, and `half` to half rows, which saves space but may leave the cards under it half a row off the rows of the sections beside it | `full`                                                                          |
 
-A group holds the update entities of an integration, in some areas or outside them, or exactly the ones listed.
+A group holds the update entities of an integration, in some areas or outside them, or exactly the entities listed.
 
-| Name            | Type   | Description                                                                        |
-| --------------- | ------ | ---------------------------------------------------------------------------------- |
-| `name`          | string | Shown above the group. Without one, the group has no heading                       |
-| `integration`   | string | Only update entities of this integration, such as `esphome` or `marketplace`       |
-| `areas`         | list   | Only update entities in these areas, by the entity's own area or else its device's |
-| `exclude_areas` | list   | No update entities from these areas                                                |
-| `entities`      | list   | Exactly these update entities, instead of the integration and areas                |
-| `exclude`       | list   | Update entities never shown in the group                                           |
+| Name               | Type   | Description                                                                                                                                                                 |
+| ------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`             | string | Shown above the group. Without one, the group has no heading                                                                                                                |
+| `integration`      | string | Only update entities of this integration, such as `esphome` or `marketplace`                                                                                                |
+| `areas`            | list   | Only update entities in these areas, by the entity's own area or else its device's                                                                                          |
+| `exclude_areas`    | list   | No update entities from these areas                                                                                                                                         |
+| `entities`         | list   | Exactly these entities, instead of the integration and areas. Besides update entities, sensors that count waiting updates and binary sensors that tell of a problem (below) |
+| `exclude`          | list   | Entities never shown in the group                                                                                                                                           |
+| `list_attribute`   | string | The attribute of a count sensor that lists what waits                                                                                                                       |
+| `reason_attribute` | string | The attribute of a problem sensor that tells what the problem is, as a text or a list of them                                                                               |
+| `age_attribute`    | string | The attribute that tells how many days the oldest update has waited                                                                                                         |
+| `age_days`         | number | From how many days on, by `age_attribute`, the row's count is shown in orange                                                                                               |
 
-Update entities hidden in Home Assistant are left out, except when listed in `entities`.
+Update entities hidden in Home Assistant are left out, except when listed in `entities`. Sensors and binary sensors are
+taken only from `entities`, never by the integration or the areas.
 
 ## What it shows
 
@@ -106,6 +115,18 @@ other entities is unavailable or is a connection sensor that is off. Such rows g
 their group, and don't count as waiting. The status line counts them instead. ESPHome, for one, keeps a sleeping device's update
 entity available, and its status sensor too, which turns off. That is why the device's other entities are asked, and
 why a connection sensor counts by what it says.
+
+**Counts and problems.** A sensor listed in a group's `entities` counts updates that have no update entity, such as a
+server's waiting packages. It waits while its state is above zero and shows the state with its unit, and at zero it is
+up to date. With `list_attribute`, its row opens to the list. With `age_attribute` and `age_days`, its count turns orange
+once the oldest update has waited that long. A binary sensor listed there tells that something needs attention, such as
+a reboot. It shows only while it is on, with what its `reason_attribute` says. Neither has an install button, and neither
+counts for **Update all**.
+
+**Names.** A row is named after its device, as the entity's own name adds only "Firmware" to it. When a device has more
+than one update entity, each row is named after both the device and the entity, to tell them apart. When an update
+entity shares its device with another entity of the group, its row takes the entity's name alone. A count or problem
+sensor's row is named after its device. `names` gives any row a name of your own.
 
 **A device that isn't there.** The card lists update entities, and Home Assistant creates a new ESPHome device's update
 entity disabled. Such a device shows once its update entity is enabled in the device's settings.
@@ -171,6 +192,30 @@ groups:
   - entities:
       - update.router_firmware
       - update.nas_firmware
+```
+
+### Servers' packages
+
+Each server reports its waiting packages to a sensor, with the packages listed and the oldest one's age in attributes,
+and a problem sensor for a reboot it needs.
+
+```yaml
+type: custom:updates-card
+title: Servers
+groups:
+  - entities:
+      - update.web_server_os
+      - sensor.web_server_packages
+      - binary_sensor.web_server_problem
+      - sensor.media_box_packages
+      - binary_sensor.media_box_problem
+    list_attribute: packages
+    reason_attribute: reasons
+    age_attribute: oldest_days
+    age_days: 60
+names:
+  - entity: update.web_server_os
+    name: Web server OS
 ```
 
 ## Translating

@@ -1,5 +1,5 @@
 /**
- * The card's visual editor: the title, the groups with what each holds, the action that updates everything, and how
+ * The card's visual editor: the title, the groups with what each holds, names for single rows, the action that updates everything, and how
  * the card rounds its height to the rows of a sections view. Its height mode is set in YAML only.
  */
 import { LitElement, html, nothing } from "lit";
@@ -11,6 +11,9 @@ import { browserLanguage, translate } from "./localize/localize";
 import { rowStepData, rowStepSchema, tidyRowStep } from "./rows";
 import type { UpdatesCardConfig } from "./types";
 import { updateIntegrations } from "./updates";
+
+/** The domains a group can list: update entities, sensors that count waiting updates and problem sensors. */
+const ROW_DOMAINS = ["update", "sensor", "binary_sensor"];
 
 interface SchemaEntry {
     name: string;
@@ -38,8 +41,25 @@ function schema(hass: HomeAssistant, config: UpdatesCardConfig, text: (key: stri
                         }),
                         areas: field("areas", { area: { multiple: true } }),
                         exclude_areas: field("exclude_areas", { area: { multiple: true } }),
-                        entities: field("entities", { entity: { multiple: true, filter: { domain: "update" } } }),
-                        exclude: field("exclude", { entity: { multiple: true, filter: { domain: "update" } } }),
+                        entities: field("entities", { entity: { multiple: true, filter: { domain: ROW_DOMAINS } } }),
+                        exclude: field("exclude", { entity: { multiple: true, filter: { domain: ROW_DOMAINS } } }),
+                        list_attribute: field("list_attribute", { text: {} }),
+                        reason_attribute: field("reason_attribute", { text: {} }),
+                        age_attribute: field("age_attribute", { text: {} }),
+                        age_days: field("age_days", { number: { min: 1, mode: "box" } }),
+                    },
+                },
+            },
+        },
+        {
+            name: "names",
+            selector: {
+                object: {
+                    multiple: true,
+                    label_field: "name",
+                    fields: {
+                        entity: field("names_entity", { entity: { filter: { domain: ROW_DOMAINS } } }),
+                        name: field("names_name", { text: {} }),
                     },
                 },
             },
@@ -82,7 +102,10 @@ export class UpdatesCardEditor extends LitElement {
         if (config.groups) {
             config.groups = config.groups.map((group) => Object.fromEntries(Object.entries(group).filter(([, value]) => !empty(value))));
         }
-        for (const key of ["title", "groups", "install_action"] as const) {
+        if (config.names) {
+            config.names = config.names.filter((entry) => entry?.entity && entry.name);
+        }
+        for (const key of ["title", "groups", "names", "install_action"] as const) {
             if (empty(config[key])) {
                 delete config[key];
             }
