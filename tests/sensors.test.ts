@@ -220,13 +220,13 @@ describe("updates-card with count and problem sensors", () => {
         expect(all(element, ".qty.old").map(text)).toEqual(["3 packages"]);
     });
 
-    it("held with nothing waiting and no group named, gives each row a line with its count or version and when it reported", async () => {
-        const hass = reporting(new Date(Date.now() - 2.5 * 3_600_000).toISOString(), "not a time");
+    it("held with nothing waiting and no group named, gives a line only to each row that tells when it reported", async () => {
+        const hass = reporting(new Date(Date.now() - 2.5 * 3_600_000).toISOString(), new Date(Date.now() - 30 * 60_000).toISOString());
+        hass.states["sensor.media_packages"] = { ...hass.states["sensor.media_packages"]!, state: "unavailable" };
         const element = await card(hass, { groups: [REPORTING], height: 300 });
         expect(all(element, ".idle-line").map(text)).toEqual([
-            "Media box · 0 packages",
-            "Web OS · 8.2",
-            "Web server · 0 packages · reported 2 hours ago",
+            "Media box · Unreachable · reported 30 minutes ago",
+            "Web server · reported 2 hours ago",
         ]);
     });
 
@@ -235,10 +235,10 @@ describe("updates-card with count and problem sensors", () => {
         try {
             const element = await card(reporting("2026-10-22T09:10:00Z", undefined), { groups: [REPORTING], height: 300 });
             const line = () => text(all(element, ".idle-line").at(-1));
-            expect(line()).toBe("Web server · 0 packages · reported 2 hours ago");
+            expect(line()).toBe("Web server · reported 2 hours ago");
             await vi.advanceTimersByTimeAsync(11 * 60_000);
             await element.updateComplete;
-            expect(line()).toBe("Web server · 0 packages · reported 3 hours ago");
+            expect(line()).toBe("Web server · reported 3 hours ago");
             element.remove();
             expect(vi.getTimerCount()).toBe(0);
         } finally {

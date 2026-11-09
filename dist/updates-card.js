@@ -1911,8 +1911,8 @@ var UpdatesCard = class extends i4 {
   /**
    * The room a card held to a set height has under its one shut line: a check, and a line for each named group with
    * devices, with how many are up to date and how many out of reach. The groups without a name share a line when a named
-   * group has one too. When no group with devices has a name, each row has a line of its own instead, with its version
-   * or count and when it last reported. More lines than fit scroll.
+   * group has one too. When no group with devices has a name, each row that tells when it last reported has a line of
+   * its own instead, saying so. More lines than fit scroll.
    */
   idle() {
     const groups = this.groupList.filter((group) => group.rows.length > 0);
@@ -1925,7 +1925,7 @@ var UpdatesCard = class extends i4 {
     const lines = named ? [
       ...groups.filter((group) => group.name).map((group) => this.groupLine(group.name, group.rows)),
       ...unnamed.length > 0 ? [this.groupLine(void 0, unnamed)] : []
-    ] : unnamed.map((row) => this.rowLine(row));
+    ] : unnamed.filter((row) => row.reported !== void 0).map((row) => this.rowLine(row, row.reported));
     return b2`<div class="idle">
             <ha-icon class="idle-icon ${this.largeCheck ? "large" : ""}" icon="mdi:check-circle-outline"></ha-icon>
             <div class="idle-lines">
@@ -1949,11 +1949,13 @@ var UpdatesCard = class extends i4 {
     ].filter(Boolean).join(" \xB7 ");
     return { icon: unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check", text };
   }
-  /** A line under the check for one row: its version or count, or that it is out of reach, and when it last reported. */
-  rowLine(row) {
-    const value = row.unreachable ? this.text("status.unreachable") : row.kind === "count" ? row.quantity : row.installed;
-    const reported = row.reported !== void 0 ? this.text("common.reported", { time: this.ago(row.reported) }) : "";
-    const text = [row.name, value, reported].filter(Boolean).join(" \xB7 ");
+  /** A line under the check for one row: when it last reported, and whether it is out of reach. */
+  rowLine(row, reported) {
+    const text = [
+      row.name,
+      row.unreachable ? this.text("status.unreachable") : "",
+      this.text("common.reported", { time: this.ago(reported) })
+    ].filter(Boolean).join(" \xB7 ");
     return { icon: row.unreachable ? "mdi:lan-disconnect" : "mdi:check", text };
   }
   /** How long ago a moment was, in minutes, hours or days, in the viewer's language. */

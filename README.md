@@ -145,9 +145,9 @@ with the list. While an **Update all** script runs, its progress bar takes its r
 
 With nothing waiting, a card held to a set height, fixed or in rows, shows a check under the line of those up to date,
 with a line for each named group with devices saying how many of them are up to date and how many are unreachable. The groups without a
-name share a line when a named group has one too. When no group with devices has a name, each row gets a line of its own instead, with
-its version or count, or that it is unreachable, and with `reported_attribute`, how long ago its source last reported. When there are
-more lines than fit, they scroll.
+name share a line when a named group has one too. When no group with devices has a name, each row whose `reported_attribute` tells when
+its source last reported gets a line of its own instead, saying how long ago that was, and whether the row is unreachable. Rows without
+it get no line. When there are more lines than fit, they scroll.
 
 On automatic rows in a sections view the card takes whole rows, so the cards under it stay on the rows, or with
 `row_step: half` half rows. The room left over goes under the status line. With `max_height`, it grows the same way up
