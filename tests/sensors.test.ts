@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { HomeAssistant } from "../src/hass";
 import "../src/updates-card";
@@ -110,6 +110,17 @@ describe("count and problem sensors", () => {
         expect(group.entities).toContain("binary_sensor.web_problem");
     });
 
+    it.each([
+        ["a date and time", "2026-10-22T09:10:00+03:00", Date.parse("2026-10-22T06:10:00Z")],
+        ["no attribute", undefined, undefined],
+        // A plain number would read as a year.
+        ["a number", 2026, undefined],
+        ["a text that is no time", "yesterday-ish", undefined],
+    ])("take when they last reported from %s only when it reads as a time", (_name, reported, expected) => {
+        const [group] = groupsOf(reporting(reported, undefined), { type: "custom:updates-card", groups: [REPORTING] }, "en");
+        expect(group.rows.find((r) => r.entity_id === "sensor.web_packages")!.reported).toBe(expected);
+    });
+
     it("never bunch, even three of the same name, unit and integration", () => {
         const hass = servers({ media: "2" });
         hass.states["sensor.third"] = {
@@ -210,22 +221,46 @@ describe("updates-card with count and problem sensors", () => {
     });
 
     it("held with nothing waiting and no group named, gives each row a line with its count or version and when it reported", async () => {
-        const hass = servers({ web: "0", mediaProblem: "off" });
-        const at = (id: string, reported: unknown) => {
-            hass.states[id] = { ...hass.states[id]!, attributes: { ...hass.states[id]!.attributes, reported } };
-        };
-        hass.states["update.web_os"] = {
-            ...hass.states["update.web_os"]!,
-            state: "off",
-            attributes: { ...hass.states["update.web_os"]!.attributes, installed_version: "8.2" },
-        };
-        at("sensor.web_packages", new Date(Date.now() - 2.5 * 3_600_000).toISOString());
-        at("sensor.media_packages", "not a time");
-        const element = await card(hass, { groups: [{ ...GROUP, name: undefined, reported_attribute: "reported" }], height: 300 });
+        const hass = reporting(new Date(Date.now() - 2.5 * 3_600_000).toISOString(), "not a time");
+        const element = await card(hass, { groups: [REPORTING], height: 300 });
         expect(all(element, ".idle-line").map(text)).toEqual([
             "Media box · 0 packages",
             "Web OS · 8.2",
             "Web server · 0 packages · reported 2 hours ago",
         ]);
     });
+
+    it("moves the time since a report on by itself while nothing else changes, and stops its clock when taken off the page", async () => {
+        vi.useFakeTimers({ now: Date.parse("2026-10-22T12:00:00Z"), toFake: ["Date", "setInterval", "clearInterval"] });
+        try {
+            const element = await card(reporting("2026-10-22T09:10:00Z", undefined), { groups: [REPORTING], height: 300 });
+            const line = () => text(all(element, ".idle-line").at(-1));
+            expect(line()).toBe("Web server · 0 packages · reported 2 hours ago");
+            await vi.advanceTimersByTimeAsync(11 * 60_000);
+            await element.updateComplete;
+            expect(line()).toBe("Web server · 0 packages · reported 3 hours ago");
+            element.remove();
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });
+
+/** The servers with nothing waiting, each package count's report time as given. */
+function reporting(web: unknown, media: unknown): HomeAssistant {
+    const hass = servers({ web: "0", mediaProblem: "off" });
+    const at = (id: string, reported: unknown) => {
+        hass.states[id] = { ...hass.states[id]!, attributes: { ...hass.states[id]!.attributes, reported } };
+    };
+    hass.states["update.web_os"] = {
+        ...hass.states["update.web_os"]!,
+        state: "off",
+        attributes: { ...hass.states["update.web_os"]!.attributes, installed_version: "8.2" },
+    };
+    at("sensor.web_packages", web);
+    at("sensor.media_packages", media);
+    return hass;
+}
+
+const REPORTING: GroupConfig = { ...GROUP, name: undefined, reported_attribute: "reported" };
