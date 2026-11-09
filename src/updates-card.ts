@@ -184,6 +184,7 @@ export class UpdatesCard extends LitElement {
     /** As last measured, whether the room under a held card's one line fits the large check with its lines. */
     @state() private largeCheck = false;
     private timer?: number;
+    private minuteTimer?: number;
     private slideTimer?: number;
     private frame?: number;
     private readonly resizes = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(() => this.measureSoon());
@@ -268,6 +269,8 @@ export class UpdatesCard extends LitElement {
         super.disconnectedCallback();
         window.clearInterval(this.timer);
         this.timer = undefined;
+        window.clearInterval(this.minuteTimer);
+        this.minuteTimer = undefined;
         this.resizes?.disconnect();
         cancelAnimationFrame(this.frame ?? 0);
         window.clearTimeout(this.slideTimer);
@@ -565,6 +568,14 @@ export class UpdatesCard extends LitElement {
             window.clearInterval(this.timer);
             this.timer = undefined;
         }
+        // When a row last reported is told in minutes, so a slower clock keeps it current while nothing else moves.
+        const reporting = [...rows.values()].some((r) => r.reported !== undefined);
+        if (reporting && this.minuteTimer === undefined) {
+            this.minuteTimer = window.setInterval(() => (this.now = Date.now()), 60_000);
+        } else if (!reporting && this.minuteTimer !== undefined) {
+            window.clearInterval(this.minuteTimer);
+            this.minuteTimer = undefined;
+        }
         // Every entity the groups hold, as a problem sensor that is off has no row until it turns on.
         const held = [...new Set(this.groupList.flatMap((g) => g.entities))];
         this.watched = [...held, ...held.flatMap((id) => this.siblingIds(hass, id)), ...(script ? [script] : [])];
@@ -690,7 +701,8 @@ export class UpdatesCard extends LitElement {
     /**
      * The room a card held to a set height has under its one shut line: a check, and a line for each named group with
      * devices, with how many are up to date and how many out of reach. The groups without a name share a line when a named
-     * group has one too. More lines than fit scroll.
+     * group has one too. When no group with devices has a name, each row has a line of its own instead, with its version
+     * or count and when it last reported. More lines than fit scroll.
      */
     private idle(): TemplateResult {
         const groups = this.groupList.filter((group) => group.rows.length > 0);
@@ -703,30 +715,57 @@ export class UpdatesCard extends LitElement {
                     .map((row) => [row.entity_id, row] as const),
             ).values(),
         ];
-        const lines = [
-            ...groups.filter((group) => group.name).map((group) => ({ name: group.name, rows: group.rows })),
-            ...(unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: undefined, rows: unnamed }] : []),
-        ];
+        const named = groups.some((group) => group.name);
+        const lines = named
+            ? [
+                  ...groups.filter((group) => group.name).map((group) => this.groupLine(group.name, group.rows)),
+                  ...(unnamed.length > 0 ? [this.groupLine(undefined, unnamed)] : []),
+              ]
+            : unnamed.map((row) => this.rowLine(row));
         return html`<div class="idle">
             <ha-icon class="idle-icon ${this.largeCheck ? "large" : ""}" icon="mdi:check-circle-outline"></ha-icon>
             <div class="idle-lines">
-                ${lines.map(({ name, rows }) => {
-                    const unreachable = rows.filter((r) => r.unreachable).length;
-                    const current = rows.length - unreachable;
-                    const text = [
-                        name,
-                        current > 0 ? this.text("common.current_count", { n: current }) : "",
-                        unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : "",
-                    ]
-                        .filter(Boolean)
-                        .join(" · ");
-                    return html`<div class="idle-line">
-                        <ha-icon icon=${unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check"}></ha-icon>
-                        <span title=${text}>${text}</span>
-                    </div>`;
-                })}
+                ${lines.map(
+                    ({ icon, text }) =>
+                        html`<div class="idle-line">
+                            <ha-icon icon=${icon}></ha-icon>
+                            <span title=${text}>${text}</span>
+                        </div>`,
+                )}
             </div>
         </div>`;
+    }
+
+    /** A line under the check for a group, or for the groups without a name together: how many are up to date and out of reach. */
+    private groupLine(name: string | undefined, rows: Row[]): { icon: string; text: string } {
+        const unreachable = rows.filter((r) => r.unreachable).length;
+        const current = rows.length - unreachable;
+        const text = [
+            name,
+            current > 0 ? this.text("common.current_count", { n: current }) : "",
+            unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : "",
+        ]
+            .filter(Boolean)
+            .join(" · ");
+        return { icon: unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check", text };
+    }
+
+    /** A line under the check for one row: its version or count, or that it is out of reach, and when it last reported. */
+    private rowLine(row: Row): { icon: string; text: string } {
+        const value = row.unreachable ? this.text("status.unreachable") : row.kind === "count" ? row.quantity : row.installed;
+        const reported = row.reported !== undefined ? this.text("common.reported", { time: this.ago(row.reported) }) : "";
+        const text = [row.name, value, reported].filter(Boolean).join(" · ");
+        return { icon: row.unreachable ? "mdi:lan-disconnect" : "mdi:check", text };
+    }
+
+    /** How long ago a moment was, in minutes, hours or days, in the viewer's language. */
+    private ago(time: number): string {
+        const minutes = Math.max(0, Math.floor((this.now - time) / 60_000));
+        const format = new Intl.RelativeTimeFormat(this.language(), { numeric: "auto" });
+        if (minutes < 60) {
+            return format.format(-minutes, "minute");
+        }
+        return minutes < 48 * 60 ? format.format(-Math.floor(minutes / 60), "hour") : format.format(-Math.floor(minutes / 1440), "day");
     }
 
     /** Whether the card is held to a height that is set, fixed or in rows, and so may have room left under its content. */

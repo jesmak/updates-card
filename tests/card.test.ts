@@ -422,10 +422,19 @@ describe("updates-card", () => {
     });
 
     // A named group with devices has a line of its own. Groups without a name share one line, counting each device once. A
-    // card with no named group that has devices gets no line.
+    // card with no named group that has devices gives each row a line, by group.
+    const EACH_ROW = [
+        "Desk lamp · 2026.2.0",
+        "Gate controller · Unreachable",
+        "Hall light · 2026.2.0",
+        "Heat pump plug · 2026.2.0",
+        "Kitchen plug · 2026.2.0",
+        "Shed heater plug · 2026.2.0",
+        "Shed sensor · 2026.2.0",
+    ];
     it.each([
         ["two named groups", CONFIG.groups!, ["update.shed_2"], ["House · 4 up to date", "Shed · 2 up to date · 1 unreachable"]],
-        ["one group without a name", [{ integration: "esphome" }], ["update.shed_2"], []],
+        ["one group without a name", [{ integration: "esphome" }], ["update.shed_2"], EACH_ROW],
         [
             "two groups without names",
             [
@@ -433,7 +442,15 @@ describe("updates-card", () => {
                 { integration: "esphome", areas: ["cabin"] },
             ],
             ["update.shed_2"],
-            [],
+            [
+                "Desk lamp · 2026.2.0",
+                "Hall light · 2026.2.0",
+                "Heat pump plug · 2026.2.0",
+                "Kitchen plug · 2026.2.0",
+                "Gate controller · Unreachable",
+                "Shed heater plug · 2026.2.0",
+                "Shed sensor · 2026.2.0",
+            ],
         ],
         [
             "a named group and one without a name",
@@ -484,7 +501,7 @@ describe("updates-card", () => {
             "a named group with no devices and one without a name",
             [{ name: "Nothing", entities: ["update.not_there"] }, { integration: "esphome" }],
             [],
-            [],
+            EACH_ROW.map((line) => line.replace("Gate controller · Unreachable", "Gate controller · 2026.2.0")),
         ],
         [
             "a named group with no devices and one with them",

@@ -64,18 +64,19 @@ masonry or panel view, or a stack or other card the card is inside, even in a se
 
 A group holds the update entities of an integration, in some areas or outside them, or exactly the entities listed.
 
-| Name               | Type   | Description                                                                                                                                                                 |
-| ------------------ | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `name`             | string | Shown above the group. Without one, the group has no heading                                                                                                                |
-| `integration`      | string | Only update entities of this integration, such as `esphome` or `marketplace`                                                                                                |
-| `areas`            | list   | Only update entities in these areas, by the entity's own area or else its device's                                                                                          |
-| `exclude_areas`    | list   | No update entities from these areas                                                                                                                                         |
-| `entities`         | list   | Exactly these entities, instead of the integration and areas. Besides update entities, sensors that count waiting updates and binary sensors that tell of a problem (below) |
-| `exclude`          | list   | Entities never shown in the group                                                                                                                                           |
-| `list_attribute`   | string | The attribute of a count sensor that lists what waits                                                                                                                       |
-| `reason_attribute` | string | The attribute of a problem sensor that tells what the problem is, as a text or a list of them                                                                               |
-| `age_attribute`    | string | The attribute that tells how many days the oldest update has waited                                                                                                         |
-| `age_days`         | number | From how many days on, by `age_attribute`, the row's count is shown in orange                                                                                               |
+| Name                 | Type   | Description                                                                                                                                                                 |
+| -------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`               | string | Shown above the group. Without one, the group has no heading                                                                                                                |
+| `integration`        | string | Only update entities of this integration, such as `esphome` or `marketplace`                                                                                                |
+| `areas`              | list   | Only update entities in these areas, by the entity's own area or else its device's                                                                                          |
+| `exclude_areas`      | list   | No update entities from these areas                                                                                                                                         |
+| `entities`           | list   | Exactly these entities, instead of the integration and areas. Besides update entities, sensors that count waiting updates and binary sensors that tell of a problem (below) |
+| `exclude`            | list   | Entities never shown in the group                                                                                                                                           |
+| `list_attribute`     | string | The attribute of a count sensor that lists what waits                                                                                                                       |
+| `reason_attribute`   | string | The attribute of a problem sensor that tells what the problem is, as a text or a list of them                                                                               |
+| `age_attribute`      | string | The attribute that tells how many days the oldest update has waited                                                                                                         |
+| `age_days`           | number | From how many days on, by `age_attribute`, the row's count is shown in orange                                                                                               |
+| `reported_attribute` | string | The attribute that tells when the entity's source last reported, as a date and time. Shown on the rows' own lines under the check (below)                                   |
 
 Update entities hidden in Home Assistant are left out, except when listed in `entities`. Sensors and binary sensors are
 taken only from `entities`, never by the integration or the areas.
@@ -144,7 +145,9 @@ with the list. While an **Update all** script runs, its progress bar takes its r
 
 With nothing waiting, a card held to a set height, fixed or in rows, shows a check under the line of those up to date,
 with a line for each named group with devices saying how many of them are up to date and how many are unreachable. The groups without a
-name share a line when a named group has one too. When there are more lines than fit, they scroll.
+name share a line when a named group has one too. When no group with devices has a name, each row gets a line of its own instead, with
+its version or count, or that it is unreachable, and with `reported_attribute`, how long ago its source last reported. When there are
+more lines than fit, they scroll.
 
 On automatic rows in a sections view the card takes whole rows, so the cards under it stay on the rows, or with
 `row_step: half` half rows. The room left over goes under the status line. With `max_height`, it grows the same way up
@@ -196,8 +199,8 @@ groups:
 
 ### Servers' packages
 
-Each server reports its waiting packages to a sensor, with the packages listed and the oldest one's age in attributes,
-and a problem sensor for a reboot it needs.
+Each server reports its waiting packages to a sensor, with the packages listed, the oldest one's age and the time of the
+report in attributes, and a problem sensor for a reboot it needs.
 
 ```yaml
 type: custom:updates-card
@@ -213,6 +216,7 @@ groups:
     reason_attribute: reasons
     age_attribute: oldest_days
     age_days: 60
+    reported_attribute: reported_at
 names:
   - entity: update.web_server_os
     name: Web server OS

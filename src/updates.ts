@@ -149,6 +149,8 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
     const group = options.group;
     const age = group?.age_attribute ? Number(attributes[group.age_attribute]) : NaN;
     const old = group?.age_days ? age >= group.age_days : false;
+    const stamp = group?.reported_attribute ? attributes[group.reported_attribute] : undefined;
+    const reported = typeof stamp === "string" && !Number.isNaN(Date.parse(stamp)) ? Date.parse(stamp) : undefined;
     if (kind !== "update") {
         const attribute = kind === "count" ? group?.list_attribute : group?.reason_attribute;
         const listed = attribute ? attributes[attribute] : undefined;
@@ -170,6 +172,7 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
             quantity: kind === "count" ? (typeof unit === "string" && unit ? `${state.state} ${unit}` : state.state) : undefined,
             items,
             old,
+            reported,
         };
     }
     const software = title ?? (device?.entry_type === "service" ? name : (entry?.platform ?? ownName));
@@ -187,6 +190,7 @@ export function rowOf(hass: HomeAssistant, entityId: string, counts: Map<string,
         canInstall: (Number(attributes.supported_features ?? 0) & FEATURE_INSTALL) !== 0,
         unreachable,
         old,
+        reported,
     };
 }
 

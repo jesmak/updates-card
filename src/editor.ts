@@ -47,6 +47,7 @@ function schema(hass: HomeAssistant, config: UpdatesCardConfig, text: (key: stri
                         reason_attribute: field("reason_attribute", { text: {} }),
                         age_attribute: field("age_attribute", { text: {} }),
                         age_days: field("age_days", { number: { min: 1, mode: "box" } }),
+                        reported_attribute: field("reported_attribute", { text: {} }),
                     },
                 },
             },

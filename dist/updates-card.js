@@ -832,6 +832,7 @@ var en_default = {
     all_updated: "All updated",
     current_count: "{n} up to date",
     unreachable_count: "{n} unreachable",
+    reported: "reported {time}",
     show: "Show",
     hide: "Hide",
     install: "Update {name}",
@@ -873,6 +874,8 @@ var en_default = {
     age_attribute_helper: "The attribute that tells how many days the oldest update has waited.",
     age_days: "Too old after days",
     age_days_helper: "From this many days on, the row's value is shown in orange.",
+    reported_attribute: "Reported attribute",
+    reported_attribute_helper: "The attribute that tells when the entity's source last reported, shown under the check when nothing waits and no group has a name.",
     names: "Names",
     names_entity: "Entity",
     names_entity_helper: "The entity whose row gets this name.",
@@ -904,6 +907,7 @@ var fi_default = {
     all_updated: "Kaikki p\xE4ivitetty",
     current_count: "{n} ajan tasalla",
     unreachable_count: "{n} ei tavoitettavissa",
+    reported: "raportoitu {time}",
     show: "N\xE4yt\xE4",
     hide: "Piilota",
     install: "P\xE4ivit\xE4 {name}",
@@ -945,6 +949,8 @@ var fi_default = {
     age_attribute_helper: "Attribuutti, joka kertoo, montako p\xE4iv\xE4\xE4 vanhin p\xE4ivitys on odottanut.",
     age_days: "Liian vanha, p\xE4iv\xE4\xE4",
     age_days_helper: "N\xE4in monesta p\xE4iv\xE4st\xE4 alkaen rivin lukema n\xE4ytet\xE4\xE4n oranssina.",
+    reported_attribute: "Raportointiajan attribuutti",
+    reported_attribute_helper: "Attribuutti, joka kertoo, milloin entiteetin l\xE4hde viimeksi raportoi. N\xE4ytet\xE4\xE4n valintamerkin alla, kun mik\xE4\xE4n ei odota eik\xE4 ryhmill\xE4 ole nimi\xE4.",
     names: "Nimet",
     names_entity: "Entiteetti",
     names_entity_helper: "Entiteetti, jonka rivi saa t\xE4m\xE4n nimen.",
@@ -1163,6 +1169,8 @@ function rowOf(hass, entityId, counts, options = {}) {
   const group = options.group;
   const age = group?.age_attribute ? Number(attributes[group.age_attribute]) : NaN;
   const old = group?.age_days ? age >= group.age_days : false;
+  const stamp = group?.reported_attribute ? attributes[group.reported_attribute] : void 0;
+  const reported = typeof stamp === "string" && !Number.isNaN(Date.parse(stamp)) ? Date.parse(stamp) : void 0;
   if (kind !== "update") {
     const attribute = kind === "count" ? group?.list_attribute : group?.reason_attribute;
     const listed = attribute ? attributes[attribute] : void 0;
@@ -1183,7 +1191,8 @@ function rowOf(hass, entityId, counts, options = {}) {
       unreachable,
       quantity: kind === "count" ? typeof unit === "string" && unit ? `${state.state} ${unit}` : state.state : void 0,
       items,
-      old
+      old,
+      reported
     };
   }
   const software = title ?? (device?.entry_type === "service" ? name : entry?.platform ?? ownName);
@@ -1200,7 +1209,8 @@ function rowOf(hass, entityId, counts, options = {}) {
     installing: progress === true || typeof progress === "number",
     canInstall: (Number(attributes.supported_features ?? 0) & FEATURE_INSTALL) !== 0,
     unreachable,
-    old
+    old,
+    reported
   };
 }
 function versionText(value) {
@@ -1308,7 +1318,8 @@ function schema(hass, config, text) {
             list_attribute: field("list_attribute", { text: {} }),
             reason_attribute: field("reason_attribute", { text: {} }),
             age_attribute: field("age_attribute", { text: {} }),
-            age_days: field("age_days", { number: { min: 1, mode: "box" } })
+            age_days: field("age_days", { number: { min: 1, mode: "box" } }),
+            reported_attribute: field("reported_attribute", { text: {} })
           }
         }
       }
@@ -1552,6 +1563,8 @@ var UpdatesCard = class extends i4 {
     super.disconnectedCallback();
     window.clearInterval(this.timer);
     this.timer = void 0;
+    window.clearInterval(this.minuteTimer);
+    this.minuteTimer = void 0;
     this.resizes?.disconnect();
     cancelAnimationFrame(this.frame ?? 0);
     window.clearTimeout(this.slideTimer);
@@ -1784,6 +1797,13 @@ var UpdatesCard = class extends i4 {
       window.clearInterval(this.timer);
       this.timer = void 0;
     }
+    const reporting = [...rows.values()].some((r6) => r6.reported !== void 0);
+    if (reporting && this.minuteTimer === void 0) {
+      this.minuteTimer = window.setInterval(() => this.now = Date.now(), 6e4);
+    } else if (!reporting && this.minuteTimer !== void 0) {
+      window.clearInterval(this.minuteTimer);
+      this.minuteTimer = void 0;
+    }
     const held = [...new Set(this.groupList.flatMap((g2) => g2.entities))];
     this.watched = [...held, ...held.flatMap((id) => this.siblingIds(hass, id)), ...script ? [script] : []];
   }
@@ -1891,7 +1911,8 @@ var UpdatesCard = class extends i4 {
   /**
    * The room a card held to a set height has under its one shut line: a check, and a line for each named group with
    * devices, with how many are up to date and how many out of reach. The groups without a name share a line when a named
-   * group has one too. More lines than fit scroll.
+   * group has one too. When no group with devices has a name, each row has a line of its own instead, with its version
+   * or count and when it last reported. More lines than fit scroll.
    */
   idle() {
     const groups = this.groupList.filter((group) => group.rows.length > 0);
@@ -1900,28 +1921,49 @@ var UpdatesCard = class extends i4 {
         groups.filter((group) => !group.name).flatMap((group) => group.rows).map((row) => [row.entity_id, row])
       ).values()
     ];
-    const lines = [
-      ...groups.filter((group) => group.name).map((group) => ({ name: group.name, rows: group.rows })),
-      ...unnamed.length > 0 && groups.some((group) => group.name) ? [{ name: void 0, rows: unnamed }] : []
-    ];
+    const named = groups.some((group) => group.name);
+    const lines = named ? [
+      ...groups.filter((group) => group.name).map((group) => this.groupLine(group.name, group.rows)),
+      ...unnamed.length > 0 ? [this.groupLine(void 0, unnamed)] : []
+    ] : unnamed.map((row) => this.rowLine(row));
     return b2`<div class="idle">
             <ha-icon class="idle-icon ${this.largeCheck ? "large" : ""}" icon="mdi:check-circle-outline"></ha-icon>
             <div class="idle-lines">
-                ${lines.map(({ name, rows }) => {
-      const unreachable = rows.filter((r6) => r6.unreachable).length;
-      const current = rows.length - unreachable;
-      const text = [
-        name,
-        current > 0 ? this.text("common.current_count", { n: current }) : "",
-        unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : ""
-      ].filter(Boolean).join(" \xB7 ");
-      return b2`<div class="idle-line">
-                        <ha-icon icon=${unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check"}></ha-icon>
-                        <span title=${text}>${text}</span>
-                    </div>`;
-    })}
+                ${lines.map(
+      ({ icon, text }) => b2`<div class="idle-line">
+                            <ha-icon icon=${icon}></ha-icon>
+                            <span title=${text}>${text}</span>
+                        </div>`
+    )}
             </div>
         </div>`;
+  }
+  /** A line under the check for a group, or for the groups without a name together: how many are up to date and out of reach. */
+  groupLine(name, rows) {
+    const unreachable = rows.filter((r6) => r6.unreachable).length;
+    const current = rows.length - unreachable;
+    const text = [
+      name,
+      current > 0 ? this.text("common.current_count", { n: current }) : "",
+      unreachable > 0 ? this.text("common.unreachable_count", { n: unreachable }) : ""
+    ].filter(Boolean).join(" \xB7 ");
+    return { icon: unreachable > 0 ? "mdi:lan-disconnect" : "mdi:check", text };
+  }
+  /** A line under the check for one row: its version or count, or that it is out of reach, and when it last reported. */
+  rowLine(row) {
+    const value = row.unreachable ? this.text("status.unreachable") : row.kind === "count" ? row.quantity : row.installed;
+    const reported = row.reported !== void 0 ? this.text("common.reported", { time: this.ago(row.reported) }) : "";
+    const text = [row.name, value, reported].filter(Boolean).join(" \xB7 ");
+    return { icon: row.unreachable ? "mdi:lan-disconnect" : "mdi:check", text };
+  }
+  /** How long ago a moment was, in minutes, hours or days, in the viewer's language. */
+  ago(time) {
+    const minutes = Math.max(0, Math.floor((this.now - time) / 6e4));
+    const format = new Intl.RelativeTimeFormat(this.language(), { numeric: "auto" });
+    if (minutes < 60) {
+      return format.format(-minutes, "minute");
+    }
+    return minutes < 48 * 60 ? format.format(-Math.floor(minutes / 60), "hour") : format.format(-Math.floor(minutes / 1440), "day");
   }
   /** Whether the card is held to a height that is set, fixed or in rows, and so may have room left under its content. */
   setHeight() {

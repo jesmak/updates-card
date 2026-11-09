@@ -20,6 +20,8 @@ export interface GroupConfig {
     /** The attribute that tells how many days the oldest update has waited, and from how many days on that is too long. */
     age_attribute?: string;
     age_days?: number;
+    /** The attribute that tells when the entity's source last reported, as a date and time. */
+    reported_attribute?: string;
 }
 
 /** A name of the user's own for one entity's row, instead of the one the card gives it. */
@@ -75,6 +77,8 @@ export interface Row {
     items?: string[];
     /** Whether the oldest update has waited the group's `age_days` or longer. */
     old?: boolean;
+    /** When the entity's source last reported, by the group's `reported_attribute`, in milliseconds. */
+    reported?: number;
 }
 
 /** Three or more waiting rows of a group that update the same software to the same version. */

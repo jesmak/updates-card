@@ -208,4 +208,24 @@ describe("updates-card with count and problem sensors", () => {
         const element = await card(servers({ age: 45 }), { groups: [GROUP] });
         expect(all(element, ".qty.old").map(text)).toEqual(["3 packages"]);
     });
+
+    it("held with nothing waiting and no group named, gives each row a line with its count or version and when it reported", async () => {
+        const hass = servers({ web: "0", mediaProblem: "off" });
+        const at = (id: string, reported: unknown) => {
+            hass.states[id] = { ...hass.states[id]!, attributes: { ...hass.states[id]!.attributes, reported } };
+        };
+        hass.states["update.web_os"] = {
+            ...hass.states["update.web_os"]!,
+            state: "off",
+            attributes: { ...hass.states["update.web_os"]!.attributes, installed_version: "8.2" },
+        };
+        at("sensor.web_packages", new Date(Date.now() - 2.5 * 3_600_000).toISOString());
+        at("sensor.media_packages", "not a time");
+        const element = await card(hass, { groups: [{ ...GROUP, name: undefined, reported_attribute: "reported" }], height: 300 });
+        expect(all(element, ".idle-line").map(text)).toEqual([
+            "Media box · 0 packages",
+            "Web OS · 8.2",
+            "Web server · 0 packages · reported 2 hours ago",
+        ]);
+    });
 });
