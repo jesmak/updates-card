@@ -108,6 +108,7 @@ describe("a row's own install", () => {
         expect(rowEnd(element, "Alpha")).toBe("button");
         expect(text(one(element, ".errline"))).toBe("Device busy");
         expect(text(one(element, ".hd-sub"))).toBe("Alpha wasn't updated");
+        expect(one(element, ".hd .hd-icon.failed")?.getAttribute("icon")).toBe("mdi:alert-circle-outline");
 
         await set(element, hassOf({ Alpha: DONE }));
         expect(rowEnd(element, "Alpha")).toBe("Updated");
@@ -194,6 +195,7 @@ describe("a row's own install", () => {
         await set(element, hassOf({ Alpha: DONE, Beta: DONE, Gamma: DONE }));
         expect(rowEnd(element, "Alpha")).toBe("Updated");
         expect(text(one(element, ".hd-sub"))).toBe("All updated");
+        expect(one(element, ".hd .hd-icon.current")?.getAttribute("icon")).toBe("mdi:check-circle-outline");
         expect(one(element, ".action")).toBeNull();
         await wait(element, DONE_KEEP - 10_000);
         expect(rowEnd(element, "Alpha")).toBe("Updated");

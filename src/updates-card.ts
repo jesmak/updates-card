@@ -83,6 +83,17 @@ const px = (value: string) => parseFloat(value) || 0;
  */
 const SLACK_PX = 0.01;
 
+type HeaderState = "current" | "unreachable" | "pending" | "problem" | "running" | "failed";
+
+const HEADER_ICONS: Record<HeaderState, string> = {
+    current: "mdi:check-circle-outline",
+    unreachable: "mdi:lan-disconnect",
+    pending: "mdi:arrow-up-circle-outline",
+    problem: "mdi:alert-circle-outline",
+    running: "mdi:sync",
+    failed: "mdi:alert-circle-outline",
+};
+
 /** The large check under a held card's one line and the room under it, as in its styles: 100 px and 20 px. */
 const LARGE_CHECK_PX = 120;
 
@@ -642,10 +653,22 @@ export class UpdatesCard extends LitElement {
         }
 
         const status = this.statusLine(active, runs);
+        // In the status line's order, so the icon and the line tell of the same thing.
+        const state: HeaderState =
+            busy || this.running
+                ? "running"
+                : active.some((s) => s.status === "failed")
+                  ? "failed"
+                  : active.some((s) => s.row.pending && s.row.kind !== "problem")
+                    ? "pending"
+                    : active.some((s) => s.row.pending)
+                      ? "problem"
+                      : "current";
         const currentText = this.text("common.current_count", { n: current.length });
         return html`
             <ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
                 <div class="hd">
+                    ${this.headerIcon(state)}
                     <div class="hd-title" title=${title}>${title}</div>
                     ${action}
                 </div>
@@ -666,10 +689,15 @@ export class UpdatesCard extends LitElement {
         `;
     }
 
+    /** The icon before the title, which tells at a glance what the status line under it says. */
+    private headerIcon(state: HeaderState): TemplateResult {
+        return html`<ha-icon class="hd-icon ${state} ${state === "running" ? "spin" : ""}" icon=${HEADER_ICONS[state]}></ha-icon>`;
+    }
+
     /**
-     * While nothing waits, as in wud-queue-card: the header with a check, the status line, and the line of those up to date,
-     * which opens to the rows up to date and those out of reach, by group. With no rows at all, as when the groups hold only
-     * problem sensors that are off, there is no line to open.
+     * While nothing waits, as in wud-queue-card: the header with a check, or with a cut connection while a device is out of
+     * reach, the status line, and the line of those up to date, which opens to the rows up to date and those out of reach, by
+     * group. With no rows at all, as when the groups hold only problem sensors that are off, there is no line to open.
      */
     private folded(title: string, current: number, unreachable: number): TemplateResult {
         const status = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current");
@@ -679,7 +707,7 @@ export class UpdatesCard extends LitElement {
         const idle = this.setHeight() && (!this.open || !rows);
         return html`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
             <div class="hd">
-                <ha-icon class="hd-icon" icon="mdi:check-circle-outline"></ha-icon>
+                ${this.headerIcon(unreachable > 0 ? "unreachable" : "current")}
                 <div class="hd-title" title=${title}>${title}</div>
             </div>
             <div class="hd-sub" title=${status}>${status}</div>
@@ -1191,10 +1219,24 @@ export class UpdatesCard extends LitElement {
                     padding: 12px 12px 0 16px;
                 }
 
-                /* A check before the title while nothing waits, as in wud-queue-card. */
+                /* An icon before the title for the card's state, as in wud-queue-card. Green is for nothing to do. */
                 .hd-icon {
                     flex: none;
                     color: var(--success-color, #43a047);
+                }
+
+                .hd-icon.pending,
+                .hd-icon.running {
+                    color: var(--primary-color);
+                }
+
+                .hd-icon.unreachable,
+                .hd-icon.problem {
+                    color: var(--warning-color, #ffa600);
+                }
+
+                .hd-icon.failed {
+                    color: var(--error-color, #db4437);
                 }
 
                 /* A letter's blank side bearing, about 0.083 em in Roboto, grows with the title's size, so the title moves left by
@@ -1213,7 +1255,7 @@ export class UpdatesCard extends LitElement {
                     font-size: 12px;
                 }
 
-                /* Under the check, the status line starts where the title does: the header's padding, the icon and the gap. */
+                /* Under the icon, the status line starts where the title does: the header's padding, the icon and the gap. */
                 .hd:has(.hd-icon) + .hd-sub {
                     padding-left: 50px;
                 }

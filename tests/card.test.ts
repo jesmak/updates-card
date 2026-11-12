@@ -79,6 +79,7 @@ describe("updates-card", () => {
     it("counts devices out of reach in its status line, and shows them in their groups", async () => {
         const element = await card(home({ installed: "2026.2.0" }, { state: "unavailable" }));
         expect(text(one(element, ".hd-sub"))).toBe("Up to date · 3 unreachable");
+        expect(one(element, ".hd .hd-icon.unreachable")?.getAttribute("icon")).toBe("mdi:lan-disconnect");
         expect(text(one(element, ".switch.quiet .switch-text"))).toBe("4 up to date");
         (one(element, ".switch.quiet") as HTMLButtonElement).click();
         await element.updateComplete;
@@ -130,6 +131,7 @@ describe("updates-card", () => {
     it("bunches waiting devices of the same software and version, and lists them all when opened", async () => {
         const element = await card(home({ state: "on", installed: "2026.1.0", latest: "2026.2.0" }));
         expect(text(one(element, ".hd-sub"))).toBe("7 waiting for an update");
+        expect(one(element, ".hd .hd-icon.pending")?.getAttribute("icon")).toBe("mdi:arrow-up-circle-outline");
         expect(all(element, ".sum").map(text)).toEqual(["Firmware4 2026.1.0 → 2026.2.0", "Firmware3 2026.1.0 → 2026.2.0"]);
         // A summary row has no install button of its own.
         expect(all(element, ".sum .install")).toHaveLength(0);
@@ -179,6 +181,7 @@ describe("updates-card", () => {
         expect(text(one(element, ".pill.running"))).toBe("Updating");
         expect((all(element, ".install")[0] as HTMLButtonElement).disabled).toBe(true);
         expect(text(one(element, ".hd-sub"))).toBe("Updating Alpha");
+        expect(one(element, ".hd .hd-icon.running.spin")?.getAttribute("icon")).toBe("mdi:sync");
         const beta = all(element, ".install").find((b) => b.getAttribute("aria-label")?.includes("Beta")) as HTMLButtonElement;
         expect(beta.disabled).toBe(true);
         beta.click();

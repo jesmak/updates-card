@@ -1431,6 +1431,14 @@ function narrowestWidth(columns) {
 }
 var px = (value) => parseFloat(value) || 0;
 var SLACK_PX2 = 0.01;
+var HEADER_ICONS = {
+  current: "mdi:check-circle-outline",
+  unreachable: "mdi:lan-disconnect",
+  pending: "mdi:arrow-up-circle-outline",
+  problem: "mdi:alert-circle-outline",
+  running: "mdi:sync",
+  failed: "mdi:alert-circle-outline"
+};
 var LARGE_CHECK_PX = 120;
 var QUIET_GAP_PX = 6;
 var CARD_PARTS = [".hd", ".hd-sub", ".bar", ".list", ".switch", ".message", ".idle"].map((part) => `:scope > ${part}`).join(", ");
@@ -1863,10 +1871,12 @@ var UpdatesCard = class extends i4 {
             </button>`;
     }
     const status = this.statusLine(active, runs);
+    const state = busy || this.running ? "running" : active.some((s5) => s5.status === "failed") ? "failed" : active.some((s5) => s5.row.pending && s5.row.kind !== "problem") ? "pending" : active.some((s5) => s5.row.pending) ? "problem" : "current";
     const currentText = this.text("common.current_count", { n: current.length });
     return b2`
             <ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
                 <div class="hd">
+                    ${this.headerIcon(state)}
                     <div class="hd-title" title=${title}>${title}</div>
                     ${action}
                 </div>
@@ -1882,10 +1892,14 @@ var UpdatesCard = class extends i4 {
             </ha-card>
         `;
   }
+  /** The icon before the title, which tells at a glance what the status line under it says. */
+  headerIcon(state) {
+    return b2`<ha-icon class="hd-icon ${state} ${state === "running" ? "spin" : ""}" icon=${HEADER_ICONS[state]}></ha-icon>`;
+  }
   /**
-   * While nothing waits, as in wud-queue-card: the header with a check, the status line, and the line of those up to date,
-   * which opens to the rows up to date and those out of reach, by group. With no rows at all, as when the groups hold only
-   * problem sensors that are off, there is no line to open.
+   * While nothing waits, as in wud-queue-card: the header with a check, or with a cut connection while a device is out of
+   * reach, the status line, and the line of those up to date, which opens to the rows up to date and those out of reach, by
+   * group. With no rows at all, as when the groups hold only problem sensors that are off, there is no line to open.
    */
   folded(title, current, unreachable) {
     const status = unreachable > 0 ? this.text("common.current_unreachable", { n: unreachable }) : this.text("common.all_current");
@@ -1894,7 +1908,7 @@ var UpdatesCard = class extends i4 {
     const idle = this.setHeight() && (!this.open || !rows);
     return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
             <div class="hd">
-                <ha-icon class="hd-icon" icon="mdi:check-circle-outline"></ha-icon>
+                ${this.headerIcon(unreachable > 0 ? "unreachable" : "current")}
                 <div class="hd-title" title=${title}>${title}</div>
             </div>
             <div class="hd-sub" title=${status}>${status}</div>
@@ -2342,10 +2356,24 @@ var UpdatesCard = class extends i4 {
                     padding: 12px 12px 0 16px;
                 }
 
-                /* A check before the title while nothing waits, as in wud-queue-card. */
+                /* An icon before the title for the card's state, as in wud-queue-card. Green is for nothing to do. */
                 .hd-icon {
                     flex: none;
                     color: var(--success-color, #43a047);
+                }
+
+                .hd-icon.pending,
+                .hd-icon.running {
+                    color: var(--primary-color);
+                }
+
+                .hd-icon.unreachable,
+                .hd-icon.problem {
+                    color: var(--warning-color, #ffa600);
+                }
+
+                .hd-icon.failed {
+                    color: var(--error-color, #db4437);
                 }
 
                 /* A letter's blank side bearing, about 0.083 em in Roboto, grows with the title's size, so the title moves left by
@@ -2364,7 +2392,7 @@ var UpdatesCard = class extends i4 {
                     font-size: 12px;
                 }
 
-                /* Under the check, the status line starts where the title does: the header's padding, the icon and the gap. */
+                /* Under the icon, the status line starts where the title does: the header's padding, the icon and the gap. */
                 .hd:has(.hd-icon) + .hd-sub {
                     padding-left: 50px;
                 }

@@ -199,6 +199,7 @@ describe("updates-card with count and problem sensors", () => {
         await element.updateComplete;
         expect(all(element, ".row .alert")).toHaveLength(1);
         expect(text(all(element, ".hd-sub")[0])).toBe("1 needing attention");
+        expect(element.shadowRoot!.querySelector(".hd .hd-icon.problem")?.getAttribute("icon")).toBe("mdi:alert-circle-outline");
     });
 
     it("counts problems apart from updates in its status line", async () => {
