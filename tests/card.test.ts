@@ -63,7 +63,7 @@ describe("updates-card", () => {
     it("says all is up to date under a check when nothing waits, and its line of those up to date opens to every device by group", async () => {
         const element = await card(home({ installed: "2026.2.0" }));
         expect(text(one(element, ".hd"))).toBe("Devices");
-        expect(one(element, ".hd .hd-icon")?.getAttribute("icon")).toBe("mdi:check-circle-outline");
+        expect(one(element, ".hd .hd-icon.current")?.getAttribute("icon")).toBe("mdi:check-circle-outline");
         expect(text(one(element, ".hd-sub"))).toBe("All up to date");
         expect(text(one(element, ".switch.quiet"))).toBe("7 up to date Show");
         // Out of the list, which is what scrolls when the card is held, so the line stays while the devices scroll.
@@ -201,6 +201,8 @@ describe("updates-card", () => {
         await element.updateComplete;
         expect(all(element, ".install")).toHaveLength(0);
         expect(text(one(element, ".hd-sub"))).toBe("Updating all · 0/7 done");
+        // The script alone, with no row installing yet, already turns the icon.
+        expect(one(element, ".hd .hd-icon.running")?.getAttribute("icon")).toBe("mdi:sync");
 
         const actions: unknown[] = [];
         element.addEventListener("hass-action", (e) => actions.push((e as CustomEvent).detail));

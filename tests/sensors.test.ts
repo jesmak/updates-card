@@ -205,6 +205,7 @@ describe("updates-card with count and problem sensors", () => {
     it("counts problems apart from updates in its status line", async () => {
         const element = await card(servers(), { groups: [GROUP] });
         expect(text(all(element, ".hd-sub")[0])).toBe("2 waiting for an update · 1 needing attention");
+        expect(element.shadowRoot!.querySelector(".hd .hd-icon.pending")?.getAttribute("icon")).toBe("mdi:arrow-up-circle-outline");
     });
 
     it("says all is up to date when its groups hold only problem sensors that are off", async () => {
