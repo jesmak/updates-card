@@ -89,6 +89,11 @@ taken only from `entities`, never by the integration or the areas.
 **Nothing waiting.** A check before the title, the status line, and a line counting the devices up to date. Tapping
 its **Show** opens every update entity, muted, by group, with its version.
 
+**The icon before the title** tells the card's state at a glance, in the theme's colours. It is a check while nothing
+waits, an arrow while updates do, a spinning one while something installs, and a red alert after an install that
+failed. With nothing waiting it turns into an orange cut connection while a device is unreachable. When only a problem
+sensor is on, it is an orange alert.
+
 **Updates waiting.** Each group shows the rows with an update, with the version installed and the one available. A
 line at the bottom opens the rest. Three or more rows of a group that update the same software to the same version
 fold into one row, named after the software, which opens to all of them. The same software means the same integration
