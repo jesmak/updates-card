@@ -76,6 +76,24 @@ describe("updates-card", () => {
         expect(all(element, ".row.sib .name").map(text)).toEqual([...HOUSE].sort().concat([...SHED].sort()));
     });
 
+    it("puts the status line in the title's place beside the icon when the title is set empty", async () => {
+        const titled = await card(home({ installed: "2026.2.0" }), { ...CONFIG, height: 400 });
+        const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, title: "", height: 400 });
+        expect(text(one(element, ".hd .hd-title.hd-status"))).toBe("All up to date");
+        expect(one(element, ".hd .hd-icon.current")).not.toBeNull();
+        expect(one(element, ".hd-sub")).toBeNull();
+        // The status line no longer takes a row of its own, so the least height a held card needs is that much lower.
+        const least = (e: UpdatesCard) => (e as unknown as { minimumHeight(): number }).minimumHeight();
+        expect(least(titled) - least(element)).toBe(19);
+    });
+
+    it("puts less than a row to spare under the status line on a card held to a height", async () => {
+        const element = await card(home({ installed: "2026.2.0" }), { ...CONFIG, height: 400 });
+        Object.assign(element as unknown as { spare: number }, { spare: 24 });
+        await element.updateComplete;
+        expect(element.shadowRoot!.querySelector("ha-card")!.getAttribute("style")).toBe("height: 400px; --uc-spare: 24px");
+    });
+
     it("counts devices out of reach in its status line, and shows them in their groups", async () => {
         const element = await card(home({ installed: "2026.2.0" }, { state: "unavailable" }));
         expect(text(one(element, ".hd-sub"))).toBe("Up to date · 3 unreachable");
@@ -286,6 +304,23 @@ describe("updates-card", () => {
         expect(await fill()).not.toBe(own);
     });
 
+    it("gives a held card's room to the picture shown while nothing waits, and keeps none it had", async () => {
+        const element = await quiet({ height: 300 }, "grid");
+        const haCard = one(element, "ha-card") as HTMLElement;
+        const box = (target: Element, height: number) =>
+            (target.getBoundingClientRect = () => ({ top: 0, bottom: height, height, width: 300 }) as DOMRect);
+        Object.defineProperty(haCard, "clientWidth", { value: 300, configurable: true });
+        box(haCard, 300);
+        box(one(element, ".hd")!, 41);
+        box(one(element, ".hd-sub")!, 17);
+        // The picture has grown into all the room but 20 px, which an earlier measure gave as spare room.
+        box(one(element, ".idle")!, 200);
+        Object.assign(element as unknown as { spare: number }, { spare: 20 });
+        (element as unknown as { fillRows(): void }).fillRows();
+        await element.updateComplete;
+        expect(haCard.getAttribute("style")).toBe("height: 300px");
+    });
+
     // The parts add up to 120.4 px, a fraction over two rows, and then to 216 px drawn at 0.8, as a dialog opening draws it.
     it.each([
         ["a fraction of a pixel over a row, on the next one", 62.4, 1, "min-height: 184px; --uc-spare: 63px"],
@@ -327,7 +362,7 @@ describe("updates-card", () => {
             return haCard.getAttribute("style") ?? "";
         };
         expect(await fill(44)).toMatch(/^max-height: 568px; min-height: (56|120|184)px; --uc-spare: \d+px$/);
-        expect(await fill(900)).toBe("max-height: 568px; min-height: 568px; --uc-spare: 0px");
+        expect(await fill(900)).toBe("max-height: 568px; min-height: 568px");
     });
 
     it.each([

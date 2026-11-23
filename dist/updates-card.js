@@ -1042,6 +1042,10 @@ function filledHeight(content, config, limit = Infinity) {
 function spareRoom(filled, content) {
   return Math.max(0, Math.floor(filled - content + SLACK_PX));
 }
+function heldSpare(held, content) {
+  const spare = spareRoom(held, content);
+  return spare < ROW_PX ? spare : 0;
+}
 function fillLimit(config, layout, minimum = 0) {
   const rows = config.grid_options ? config.grid_options.rows : config.layout_options?.grid_rows;
   if (layout !== "grid" || typeof rows === "number") {
@@ -1418,7 +1422,8 @@ registry.customCards.push({
   documentationURL: "https://github.com/jesmak/updates-card",
   preview: true
 });
-var HELD_FRAME_PX = 44 + 19 + 6 + 29 + 8 + 37 + 2;
+var STATUS_LINE_PX = 19;
+var HELD_FRAME_PX = 44 + STATUS_LINE_PX + 6 + 29 + 8 + 37 + 2;
 var FIRST_ROW_PX = [
   [288, 44],
   [214, 58],
@@ -1555,7 +1560,27 @@ var UpdatesCard = class extends i4 {
    */
   minimumHeight() {
     const narrowest = Math.min(narrowestWidth(this.gridColumns()), this.width || Infinity);
-    return HELD_FRAME_PX + FIRST_ROW_PX.find(([width]) => narrowest >= width)[1];
+    return HELD_FRAME_PX - (this.untitled() ? STATUS_LINE_PX : 0) + FIRST_ROW_PX.find(([width]) => narrowest >= width)[1];
+  }
+  /** Whether the title is set empty, so the status line takes its place in the header. */
+  untitled() {
+    return this.config?.title === "";
+  }
+  /** The header: the icon and the title, or without a title the status line in its place, and the line under it. */
+  header(icon, title, status, action = A) {
+    if (this.untitled()) {
+      return b2`<div class="hd">
+                ${icon}
+                <div class="hd-title hd-status" title=${status}>${status}</div>
+                ${action}
+            </div>`;
+    }
+    return b2`<div class="hd">
+                ${icon}
+                <div class="hd-title" title=${title}>${title}</div>
+                ${action}
+            </div>
+            <div class="hd-sub" title=${status}>${status}</div>`;
   }
   /** The columns set in the layout tab, in either form Home Assistant has saved them, or a whole section. */
   gridColumns() {
@@ -1677,7 +1702,8 @@ var UpdatesCard = class extends i4 {
       this.width = width;
     }
     const limit = fillLimit(this.config ?? {}, this.layout, this.minimumHeight());
-    if (!limit) {
+    const held = !limit && Boolean(heightStyle(this.config ?? {}, this.layout, this.minimumHeight()));
+    if (!limit && !held) {
       if (this.filled) this.filled = 0;
       if (this.spare) this.spare = 0;
       return;
@@ -1691,6 +1717,13 @@ var UpdatesCard = class extends i4 {
       content += px(partStyle.marginTop) + height + px(partStyle.marginBottom);
     }
     content -= this.spareShown(card);
+    if (held) {
+      const idle = card.querySelector(":scope > .idle");
+      const spare2 = idle ? 0 : heldSpare(card.getBoundingClientRect().height / scale, content);
+      if (this.filled) this.filled = 0;
+      if (spare2 !== this.spare) this.spare = spare2;
+      return;
+    }
     const filled = filledHeight(content, this.config ?? {}, limit);
     const spare = spareRoom(filled, content);
     if (filled !== this.filled) {
@@ -1712,7 +1745,7 @@ var UpdatesCard = class extends i4 {
   /** The card's inline style: the height it is held to, or the rows it fills up to any limit, with their spare room under the status line. */
   cardStyle() {
     const style = filledStyle(this.config ?? {}, this.layout, this.minimumHeight(), this.filled);
-    return this.filled ? `${style}; --uc-spare: ${this.spare}px` : style;
+    return this.spare ? [style, `--uc-spare: ${this.spare}px`].filter(Boolean).join("; ") : style;
   }
   /** The card's classes: held to a height, its texts above the list keep to one line, and a slide moves its rows along. */
   cardClass() {
@@ -1875,12 +1908,7 @@ var UpdatesCard = class extends i4 {
     const currentText = this.text("common.current_count", { n: current.length });
     return b2`
             <ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
-                <div class="hd">
-                    ${this.headerIcon(state)}
-                    <div class="hd-title" title=${title}>${title}</div>
-                    ${action}
-                </div>
-                <div class="hd-sub" title=${status}>${status}</div>
+                ${this.header(this.headerIcon(state), title, status, action)}
                 ${this.running && runs.length > 0 ? this.progress(runs) : A}
                 <div class="list">
                     <div class="cols">${this.groupList.map((group) => this.waitingGroup(group, shown, busy))}</div>
@@ -1907,11 +1935,7 @@ var UpdatesCard = class extends i4 {
     const rows = current + unreachable > 0;
     const idle = this.setHeight() && (!this.open || !rows);
     return b2`<ha-card class=${this.cardClass()} style=${this.cardStyle()} @transitionend=${this.slid}>
-            <div class="hd">
-                ${this.headerIcon(unreachable > 0 ? "unreachable" : "current")}
-                <div class="hd-title" title=${title}>${title}</div>
-            </div>
-            <div class="hd-sub" title=${status}>${status}</div>
+            ${this.header(this.headerIcon(unreachable > 0 ? "unreachable" : "current"), title, status)}
             ${rows ? b2`<button class="switch quiet" aria-expanded=${this.open ? "true" : "false"} @click=${this.toggleAll}>
                               <span class="switch-text" title=${count}>${count}</span>
                               <span>${this.text(this.open ? "common.hide" : "common.show")}</span>
@@ -2389,6 +2413,11 @@ var UpdatesCard = class extends i4 {
                 .hd-sub {
                     flex: none;
                     padding: 0 16px 2px;
+                    font-size: 12px;
+                }
+
+                /* With no title, the status line takes its place beside the icon, at its own size. */
+                .hd-title.hd-status {
                     font-size: 12px;
                 }
 
