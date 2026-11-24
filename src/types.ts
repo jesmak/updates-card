@@ -1,3 +1,4 @@
+import type { ScrollIndicatorConfig } from "./fade";
 import type { LovelaceCardConfig } from "./hass";
 import type { RowStepConfig } from "./rows";
 
@@ -40,7 +41,7 @@ export interface ActionConfig {
     [key: string]: unknown;
 }
 
-export interface UpdatesCardConfig extends LovelaceCardConfig, RowStepConfig {
+export interface UpdatesCardConfig extends LovelaceCardConfig, RowStepConfig, ScrollIndicatorConfig {
     /** Shown at the top of the card. Without one the card is titled in the viewer's language. */
     title?: string;
     /** Without groups, every update entity in one group without a name. */
