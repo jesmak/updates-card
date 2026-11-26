@@ -231,7 +231,9 @@ names:
 ## Translating
 
 The card's texts are in `src/localize/languages/`, one JSON file per language, named by its language code. English
-and Finnish are there. To add a language, copy `en.json`, translate its texts and open a pull request.
+and Finnish are there. To add a language, copy `en.json`, translate its texts and open a pull request. A file may name
+a region, such as `pt-br.json`. It is used for `pt-BR`, falling back to a file for the language alone (`pt.json`), and
+then to English.
 
 ## Development
 
